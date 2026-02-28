@@ -166,6 +166,17 @@ All endpoints (except `/` and `/api/v1/health`) require the `X-API-Key` header.
 
 Submit a new job. Returns `202 Accepted` with the created job object.
 
+**Request body:**
+
+| Parameter | Required | Description |
+|---|---|---|
+| `prompt` | **yes** | The text prompt to send to Claude |
+| `model` | no | `haiku` (default), `sonnet`, or `opus` |
+| `system_prompt` | no | Custom system instruction prepended to the prompt |
+| `callback_url` | no | Webhook URL — ClaudeGate POSTs the result here when the job finishes |
+| `response_format` | no | `text` (default) or `json` — JSON mode strips markdown fences from the response |
+| `metadata` | no | Arbitrary JSON object, returned as-is in the job response |
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/jobs \
   -H "X-API-Key: your-secret-key-here" \
@@ -174,7 +185,9 @@ curl -X POST http://localhost:8080/api/v1/jobs \
     "prompt": "Explain what a mutex is in one sentence.",
     "model": "haiku",
     "system_prompt": "Be concise.",
-    "callback_url": "https://example.com/webhook"
+    "response_format": "json",
+    "callback_url": "https://example.com/webhook",
+    "metadata": {"user_id": 42}
   }'
 ```
 
@@ -192,6 +205,12 @@ Response:
 ### GET /api/v1/jobs/{id}
 
 Poll a job's status and result.
+
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `id` | Job UUID returned by the POST endpoint |
 
 ```bash
 curl http://localhost:8080/api/v1/jobs/a1b2c3d4-... \
@@ -218,6 +237,13 @@ Job statuses: `queued`, `processing`, `completed`, `failed`, `cancelled`.
 
 List jobs with pagination. Returns `200 OK`.
 
+**Query parameters:**
+
+| Parameter | Default | Description |
+|---|---|---|
+| `limit` | `20` | Number of jobs to return (max 100) |
+| `offset` | `0` | Number of jobs to skip |
+
 ```bash
 curl "http://localhost:8080/api/v1/jobs?limit=10&offset=0" \
   -H "X-API-Key: your-secret-key-here"
@@ -237,6 +263,12 @@ Response:
 
 Stream job progress via Server-Sent Events. The connection closes automatically when the job finishes.
 
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `id` | Job UUID to stream |
+
 ```bash
 curl -N http://localhost:8080/api/v1/jobs/a1b2c3d4-.../sse \
   -H "X-API-Key: your-secret-key-here"
@@ -251,6 +283,12 @@ Events emitted:
 
 Delete a job record. Returns `204 No Content`.
 
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `id` | Job UUID to delete |
+
 ```bash
 curl -X DELETE http://localhost:8080/api/v1/jobs/a1b2c3d4-... \
   -H "X-API-Key: your-secret-key-here"
@@ -259,6 +297,12 @@ curl -X DELETE http://localhost:8080/api/v1/jobs/a1b2c3d4-... \
 ### POST /api/v1/jobs/{id}/cancel
 
 Cancel a queued or processing job. Returns `200 OK` with the cancelled status, or `409 Conflict` if the job is already in a terminal state.
+
+**Path parameters:**
+
+| Parameter | Description |
+|---|---|
+| `id` | Job UUID to cancel |
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/jobs/a1b2c3d4-.../cancel \

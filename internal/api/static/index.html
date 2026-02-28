@@ -4,157 +4,867 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ClaudeGate — API Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#0d1117;--surface:#161b22;--border:#30363d;
-  --text:#e6edf3;--muted:#8b949e;
-  --accent:#58a6ff;--success:#3fb950;--error:#f85149;--warning:#d29922;
-  --tag-get:#238636;--tag-post:#1f6feb;--tag-delete:#da3633;
-  --radius:6px;--font-mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+
+:root {
+  --bg-deep: #121417;
+  --bg-base: #1a1d23;
+  --bg-raised: #22262e;
+  --bg-elevated: #2a2f38;
+  --bg-hover: #323842;
+
+  --border-subtle: rgba(255,255,255,0.06);
+  --border-default: rgba(255,255,255,0.1);
+  --border-strong: rgba(255,255,255,0.16);
+
+  --text-primary: #e8e6e3;
+  --text-secondary: #9b9a97;
+  --text-tertiary: #6b6a68;
+  --text-inverse: #121417;
+
+  --accent: #d4a574;
+  --accent-dim: rgba(212,165,116,0.12);
+  --accent-glow: rgba(212,165,116,0.25);
+  --accent-bright: #e8be91;
+
+  --green: #7ec699;
+  --green-dim: rgba(126,198,153,0.12);
+  --red: #e06c75;
+  --red-dim: rgba(224,108,117,0.12);
+  --blue: #82aaff;
+  --blue-dim: rgba(130,170,255,0.12);
+  --yellow: #e5c07b;
+  --yellow-dim: rgba(229,192,123,0.12);
+  --purple: #c792ea;
+  --purple-dim: rgba(199,146,234,0.12);
+
+  --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.25);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.3);
+
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-med: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5}
-a{color:var(--accent);text-decoration:none}
-button{cursor:pointer;border:none;border-radius:var(--radius);font-size:13px;font-family:inherit;transition:opacity .15s,background .15s}
-button:hover{opacity:.85}
-input,select,textarea{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;padding:6px 10px;width:100%;outline:none;transition:border-color .15s}
-input:focus,select:focus,textarea:focus{border-color:var(--accent)}
-textarea{resize:vertical;line-height:1.5}
-select option{background:var(--surface)}
 
-/* Layout */
-.app{display:flex;flex-direction:column;min-height:100vh}
-.header{background:var(--surface);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.header h1{font-size:15px;font-weight:600;white-space:nowrap}
-.header h1 span{color:var(--muted);font-weight:400}
-.apikey-bar{display:flex;align-items:center;gap:8px;flex:1;min-width:200px;max-width:500px}
-.apikey-bar label{white-space:nowrap;color:var(--muted);font-size:12px}
-.apikey-wrap{position:relative;flex:1}
-.apikey-wrap input{padding-right:34px}
-.apikey-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);padding:0;font-size:14px;line-height:1}
-.apikey-toggle:hover{color:var(--text);opacity:1}
-.btn-save{background:var(--accent);color:#fff;padding:6px 14px;white-space:nowrap}
-.key-status{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
-.key-status.valid{background:var(--success)}
-.key-status.invalid{background:var(--error)}
+html, body {
+  height: 100%;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-.main{display:flex;flex:1;overflow:hidden}
-.panel-left{width:50%;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;flex-shrink:0}
-.panel-right{flex:1;overflow-y:auto;padding:16px;min-width:0}
-.splitter{width:4px;background:var(--border);cursor:col-resize;flex-shrink:0;transition:background .15s;user-select:none}
-.splitter:hover,.splitter.active{background:rgba(88,166,255,.5)}
-
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-.card-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
-
-/* Playground */
-.field{display:flex;flex-direction:column;gap:4px}
-.field label{font-size:12px;color:var(--muted)}
-.system-toggle{background:none;color:var(--accent);font-size:12px;padding:0;text-align:left;display:flex;align-items:center;gap:4px}
-.system-toggle:hover{opacity:.8}
-.collapsed{display:none}
-.row{display:flex;gap:8px;align-items:flex-end}
-.row .field{flex:1}
-.btn-send{background:var(--accent);color:#fff;padding:8px 20px;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap}
-.btn-send:disabled{opacity:.5;cursor:not-allowed}
-
-/* Status badge */
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500}
-.badge-queued{background:rgba(210,153,34,.15);color:var(--warning)}
-.badge-processing{background:rgba(88,166,255,.15);color:var(--accent)}
-.badge-completed{background:rgba(63,185,80,.15);color:var(--success)}
-.badge-failed{background:rgba(248,81,73,.15);color:var(--error)}
-.badge-cancelled{background:rgba(139,149,158,.15);color:var(--muted)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-.badge-processing{animation:pulse 1.5s ease-in-out infinite}
-
-/* Response area */
-.response-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;font-family:var(--font-mono);font-size:13px;min-height:140px;max-height:320px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.6}
-.response-meta{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
-.response-empty{color:var(--muted);font-style:italic;font-family:inherit}
-
-/* Job history */
-.job-list{display:flex;flex-direction:column;gap:6px}
-.job-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .15s}
-.job-item:hover{border-color:var(--accent)}
-.job-id{font-family:var(--font-mono);font-size:12px;color:var(--accent);flex-shrink:0}
-.job-model{font-size:11px;color:var(--muted);flex-shrink:0}
-.job-time{font-size:11px;color:var(--muted);margin-left:auto;flex-shrink:0}
-.btn-delete{background:none;color:var(--muted);padding:2px 5px;font-size:13px;flex-shrink:0;border-radius:3px}
-.btn-delete:hover{color:var(--error);background:rgba(248,81,73,.1);opacity:1}
-.job-list-empty{color:var(--muted);font-size:12px;font-style:italic}
-.btn-refresh{background:none;border:1px solid var(--border);color:var(--muted);padding:4px 10px;font-size:12px;border-radius:var(--radius)}
-.btn-refresh:hover{border-color:var(--accent);color:var(--accent);opacity:1}
-.history-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-
-/* API Docs */
-.endpoint{border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;overflow:hidden}
-.endpoint-head{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;background:var(--bg);user-select:none;transition:background .15s}
-.endpoint-head:hover{background:#1c2128}
-.method{font-family:var(--font-mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;flex-shrink:0}
-.method-get{background:rgba(35,134,54,.2);color:#3fb950}
-.method-post{background:rgba(31,111,235,.2);color:#58a6ff}
-.method-delete{background:rgba(218,51,51,.2);color:#f85149}
-.path{font-family:var(--font-mono);font-size:13px;flex:1}
-.chevron{color:var(--muted);font-size:11px;transition:transform .2s;flex-shrink:0}
-.endpoint-body{padding:12px;border-top:1px solid var(--border);display:none;flex-direction:column;gap:10px}
-.endpoint-body.open{display:flex}
-.endpoint-desc{font-size:13px;color:var(--muted)}
-.code-block{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:var(--font-mono);font-size:12px;overflow-x:auto;white-space:pre;position:relative}
-.code-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:4px;text-transform:uppercase}
-.btn-copy{position:absolute;top:6px;right:6px;background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:2px 8px;font-size:11px;border-radius:3px}
-.btn-copy:hover{color:var(--text);opacity:1}
-.json-key{color:#79c0ff}
-.json-str{color:#a5d6ff}
-.json-num{color:#79c0ff}
-.json-bool{color:#ff7b72}
-.json-null{color:#ff7b72}
-.method-example{background:rgba(139,92,246,.2);color:#a78bfa}
-.method-step{background:rgba(139,149,158,.2);color:var(--muted);font-weight:700}
-
-/* Try it */
-.tryit-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
-.tryit-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
-.tryit-fields{display:flex;flex-direction:column;gap:6px}
-.tryit-field{display:flex;flex-direction:column;gap:3px}
-.tryit-field label{font-size:12px;color:var(--muted)}
-.tryit-row{display:flex;gap:8px;align-items:flex-end}
-.tryit-row .tryit-field{flex:1}
-.tryit-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.btn-tryit{background:var(--accent);color:#fff;padding:6px 14px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;white-space:nowrap}
-.btn-tryit:disabled{opacity:.5;cursor:not-allowed}
-.btn-cancel-sse{background:none;border:1px solid var(--error);color:var(--error);padding:5px 12px;font-size:12px;border-radius:var(--radius)}
-.btn-cancel-sse:hover{background:rgba(248,81,73,.1);opacity:1}
-.btn-use-latest{background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;font-size:11px;border-radius:var(--radius);white-space:nowrap}
-.btn-use-latest:hover{border-color:var(--accent);color:var(--accent);opacity:1}
-.tryit-response{display:none;flex-direction:column;gap:6px}
-.tryit-response.visible{display:flex}
-.tryit-response-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.http-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;font-family:var(--font-mono)}
-.http-badge-2xx{background:rgba(63,185,80,.15);color:var(--success)}
-.http-badge-3xx{background:rgba(88,166,255,.15);color:var(--accent)}
-.http-badge-4xx{background:rgba(248,81,73,.15);color:var(--error)}
-.http-badge-5xx{background:rgba(248,81,73,.15);color:var(--error)}
-.tryit-headers{font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)}
-.tryit-body{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:var(--font-mono);font-size:12px;max-height:240px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.6}
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent-bright); }
 
 /* Scrollbar */
-::-webkit-scrollbar{width:6px;height:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-tertiary); }
 
-/* Responsive */
-@media(max-width:700px){
-  .main{flex-direction:column}
-  .panel-left,.panel-right{width:100%!important}
-  .panel-left{border-right:none;border-bottom:1px solid var(--border)}
-  .splitter{display:none}
+/* ── Buttons ── */
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  transition: all var(--transition-fast);
+  outline: none;
 }
-</style>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
-<style>
-code[class*="language-"],pre[class*="language-"]{background:var(--bg)!important;font-size:12px;margin:0;padding:0}
+button:focus-visible {
+  box-shadow: 0 0 0 2px var(--bg-deep), 0 0 0 4px var(--accent);
+}
+
+/* ── Inputs ── */
+input, select, textarea {
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 8px 12px;
+  width: 100%;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+textarea { resize: vertical; line-height: 1.55; }
+select { cursor: pointer; }
+select option { background: var(--bg-raised); }
+
+/* ── Layout ── */
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Animated mesh background */
+.app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 20%, rgba(212,165,116,0.04), transparent),
+    radial-gradient(ellipse 50% 60% at 90% 80%, rgba(130,170,255,0.03), transparent),
+    radial-gradient(ellipse 70% 40% at 50% 50%, rgba(199,146,234,0.02), transparent);
+  pointer-events: none;
+  z-index: 0;
+  animation: meshShift 30s ease-in-out infinite alternate;
+}
+@keyframes meshShift {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Noise overlay */
+.app::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Header ── */
+.header {
+  position: relative;
+  z-index: 10;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.2);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.logo-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent) 0%, #c08850 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-inverse);
+  box-shadow: 0 2px 8px rgba(212,165,116,0.3);
+}
+.logo-text {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+}
+.logo-sub {
+  color: var(--text-tertiary);
+  font-weight: 400;
+  font-size: 13px;
+  margin-left: 2px;
+}
+
+.apikey-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 460px;
+  min-width: 200px;
+}
+.apikey-bar label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.apikey-wrap {
+  position: relative;
+  flex: 1;
+}
+.apikey-wrap input {
+  padding-right: 36px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  height: 34px;
+}
+.apikey-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  padding: 2px;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 3px;
+}
+.apikey-toggle:hover { color: var(--text-secondary); }
+
+.key-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex-shrink: 0;
+  transition: all var(--transition-med);
+}
+.key-status.valid { background: var(--green); box-shadow: 0 0 8px rgba(126,198,153,0.4); }
+.key-status.invalid { background: var(--red); box-shadow: 0 0 8px rgba(224,108,117,0.4); }
+
+.btn-save {
+  background: var(--accent);
+  color: var(--text-inverse);
+  padding: 6px 16px;
+  font-weight: 600;
+  font-size: 12px;
+  white-space: nowrap;
+  letter-spacing: 0.3px;
+  height: 34px;
+}
+.btn-save:hover { background: var(--accent-bright); }
+
+/* ── Main Area ── */
+.main {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.panel-left {
+  width: 48%;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.panel-right {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  min-width: 0;
+}
+
+.splitter {
+  width: 1px;
+  background: var(--border-subtle);
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  user-select: none;
+  z-index: 5;
+}
+.splitter::before {
+  content: '';
+  position: absolute;
+  inset: 0 -6px;
+  z-index: 1;
+}
+.splitter::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 40px;
+  border-radius: 3px;
+  background: var(--border-default);
+  transition: all var(--transition-fast);
+}
+.splitter:hover::after, .splitter.active::after {
+  background: var(--accent);
+  height: 60px;
+  box-shadow: 0 0 10px var(--accent-dim);
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast);
+}
+.card:hover { border-color: var(--border-default); }
+
+.card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* ── Playground ── */
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+.field-required { color: var(--red); }
+
+.row { display: flex; gap: 10px; align-items: flex-end; }
+.row .field { flex: 1; }
+
+.system-toggle {
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.system-toggle:hover { color: var(--accent-bright); }
+.system-toggle .chevron-sm {
+  transition: transform var(--transition-fast);
+  font-size: 9px;
+}
+.system-toggle.open .chevron-sm { transform: rotate(90deg); }
+.collapsed { display: none; }
+
+.checkbox-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  padding-bottom: 9px;
+}
+.checkbox-wrap input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.btn-send {
+  background: linear-gradient(135deg, var(--accent) 0%, #c08850 100%);
+  color: var(--text-inverse);
+  padding: 10px 24px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 10px rgba(212,165,116,0.25);
+  letter-spacing: 0.2px;
+}
+.btn-send:hover { box-shadow: 0 4px 16px rgba(212,165,116,0.35); transform: translateY(-1px); }
+.btn-send:active { transform: translateY(0); }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-send svg { width: 14px; height: 14px; }
+
+/* Status badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.badge::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.badge-queued { background: var(--yellow-dim); color: var(--yellow); }
+.badge-queued::before { background: var(--yellow); }
+.badge-processing { background: var(--blue-dim); color: var(--blue); }
+.badge-processing::before { background: var(--blue); animation: blink 1.2s ease-in-out infinite; }
+.badge-completed { background: var(--green-dim); color: var(--green); }
+.badge-completed::before { background: var(--green); }
+.badge-failed { background: var(--red-dim); color: var(--red); }
+.badge-failed::before { background: var(--red); }
+.badge-cancelled { background: rgba(155,154,151,0.1); color: var(--text-secondary); }
+.badge-cancelled::before { background: var(--text-secondary); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Response area */
+.response-area { margin-top: 4px; }
+.response-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.response-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+.response-jobid {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.response-box {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  min-height: 120px;
+  max-height: 340px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.65;
+  transition: border-color var(--transition-fast);
+}
+.response-box:hover { border-color: var(--border-default); }
+.response-empty {
+  color: var(--text-tertiary);
+  font-style: italic;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+/* ── Job History ── */
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.btn-refresh {
+  background: none;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.btn-refresh:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.job-list { display: flex; flex-direction: column; gap: 4px; }
+
+.job-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.job-item:hover {
+  border-color: var(--accent);
+  background: var(--bg-raised);
+  box-shadow: 0 0 0 1px var(--accent-dim);
+}
+.job-id-short {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.job-model {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  font-weight: 500;
+  background: var(--bg-elevated);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.job-time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.btn-action-sm {
+  background: none;
+  color: var(--text-tertiary);
+  padding: 3px 6px;
+  font-size: 13px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  line-height: 1;
+}
+.btn-action-sm:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+.btn-action-sm.danger:hover {
+  color: var(--red);
+  background: var(--red-dim);
+}
+
+.job-list-empty {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* ── Right Panel Sections ── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+.section-desc {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+.section-gap { margin-top: 28px; }
+
+/* ── Collapsible Endpoints / Steps ── */
+.collapse-item {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: 6px;
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+  background: var(--bg-base);
+}
+.collapse-item:hover { border-color: var(--border-default); }
+
+.collapse-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+.collapse-head:hover { background: var(--bg-raised); }
+
+.method-badge {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.5px;
+}
+.method-get { background: var(--green-dim); color: var(--green); }
+.method-post { background: var(--blue-dim); color: var(--blue); }
+.method-delete { background: var(--red-dim); color: var(--red); }
+.method-step { background: var(--purple-dim); color: var(--purple); }
+.method-lang { background: var(--accent-dim); color: var(--accent); }
+
+.collapse-path {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  flex: 1;
+  color: var(--text-primary);
+}
+.collapse-path.non-mono {
+  font-family: var(--font-body);
+  font-weight: 500;
+}
+
+.collapse-chevron {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.collapse-body {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--border-subtle);
+  display: none;
+  flex-direction: column;
+  gap: 12px;
+}
+.collapse-body.open { display: flex; }
+.collapse-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Code blocks */
+.code-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-bottom: 4px;
+}
+.code-block {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: pre;
+  position: relative;
+  line-height: 1.6;
+}
+.code-block code { background: none !important; padding: 0 !important; }
+.code-block pre { margin: 0; background: none !important; }
+
+.btn-copy {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  font-family: var(--font-body);
+  opacity: 0;
+  transition: all var(--transition-fast);
+}
+.code-block:hover .btn-copy { opacity: 1; }
+.btn-copy:hover { color: var(--text-primary); border-color: var(--border-strong); }
+
+/* JSON highlighting */
+.json-key { color: var(--blue); }
+.json-str { color: var(--green); }
+.json-num { color: var(--accent); }
+.json-bool { color: var(--red); }
+.json-null { color: var(--red); }
+
+/* ── Try it section ── */
+.tryit-section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tryit-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+.tryit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tryit-field { display: flex; flex-direction: column; gap: 4px; }
+.tryit-field label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.tryit-row { display: flex; gap: 8px; align-items: flex-end; }
+.tryit-row .tryit-field { flex: 1; }
+
+.tryit-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.btn-tryit {
+  background: var(--accent);
+  color: var(--text-inverse);
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+.btn-tryit:hover { background: var(--accent-bright); }
+.btn-tryit:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-cancel-sse {
+  background: none;
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+.btn-cancel-sse:hover { background: var(--red-dim); }
+
+.btn-use-latest {
+  background: none;
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  padding: 5px 10px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  font-weight: 500;
+}
+.btn-use-latest:hover { border-color: var(--accent); color: var(--accent); }
+
+.tryit-response {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+}
+.tryit-response.visible { display: flex; }
+.tryit-response-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.http-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+}
+.http-badge-2xx { background: var(--green-dim); color: var(--green); }
+.http-badge-3xx { background: var(--blue-dim); color: var(--blue); }
+.http-badge-4xx { background: var(--red-dim); color: var(--red); }
+.http-badge-5xx { background: var(--red-dim); color: var(--red); }
+
+.tryit-headers {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  padding: 6px 10px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+.tryit-body {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+}
+
+/* Prism overrides */
+code[class*="language-"], pre[class*="language-"] {
+  background: transparent !important;
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 700px) {
+  .main { flex-direction: column; }
+  .panel-left, .panel-right { width: 100% !important; }
+  .panel-left { border-bottom: 1px solid var(--border-subtle); }
+  .splitter { display: none; }
+  .header { padding: 0 16px; gap: 12px; height: auto; padding: 12px 16px; flex-wrap: wrap; }
+  .apikey-bar { max-width: 100%; }
+  .logo-sub { display: none; }
+}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup-templating.min.js"></script>
@@ -167,11 +877,14 @@ code[class*="language-"],pre[class*="language-"]{background:var(--bg)!important;
 
   <!-- Header -->
   <div class="header">
-    <h1>ClaudeGate <span>— API Playground</span></h1>
+    <div class="logo">
+      <div class="logo-icon">G</div>
+      <div class="logo-text">ClaudeGate <span class="logo-sub">API Playground</span></div>
+    </div>
     <div class="apikey-bar">
-      <label>API Key:</label>
+      <label>Key</label>
       <div class="apikey-wrap">
-        <input type="password" id="apiKeyInput" placeholder="your-api-key" autocomplete="off">
+        <input type="password" id="apiKeyInput" placeholder="your-api-key" autocomplete="off" spellcheck="false">
         <button class="apikey-toggle" id="keyToggle" title="Show/hide key">&#128065;</button>
       </div>
       <div class="key-status" id="keyStatus" title="Key status"></div>
@@ -181,63 +894,66 @@ code[class*="language-"],pre[class*="language-"]{background:var(--bg)!important;
 
   <div class="main">
 
-    <!-- Left panel: Playground + History -->
+    <!-- Left panel -->
     <div class="panel-left">
 
-      <!-- Playground card -->
+      <!-- Playground -->
       <div class="card">
-        <div class="card-title">Playground</div>
+        <div class="card-label">Playground</div>
 
-        <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;flex-direction:column;gap:12px">
           <div class="row">
             <div class="field">
-              <label>Model</label>
+              <span class="field-label">Model</span>
               <select id="modelSelect">
                 <option value="haiku">claude-haiku</option>
                 <option value="sonnet">claude-sonnet</option>
                 <option value="opus">claude-opus</option>
               </select>
             </div>
-            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap">
+            <label class="checkbox-wrap">
               <input type="checkbox" id="jsonMode"> JSON mode
             </label>
           </div>
 
           <div class="field">
             <button class="system-toggle" id="systemToggleBtn">
-              <span id="systemChevron">&#9654;</span> System Prompt <span style="color:var(--muted)">(optional)</span>
+              <span class="chevron-sm">&#9654;</span> System prompt <span style="color:var(--text-tertiary);font-weight:400">(optional)</span>
             </button>
             <textarea id="systemPrompt" class="collapsed" rows="3" placeholder="You are a helpful assistant."></textarea>
           </div>
 
           <div class="field">
-            <label>Prompt <span style="color:var(--error)">*</span></label>
+            <span class="field-label">Prompt <span class="field-required">*</span></span>
             <textarea id="promptInput" rows="4" placeholder="Ask something..."></textarea>
           </div>
 
           <div>
             <button class="btn-send" id="btnSend">
-              <span>&#9654;</span> Send
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h12M10 4l4 4-4 4"/></svg>
+              Send
             </button>
           </div>
 
-          <!-- Response -->
-          <div>
+          <div class="response-area">
             <div class="response-meta">
-              <span style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em">Response</span>
+              <span class="response-label">Response</span>
               <span id="statusBadge"></span>
-              <span id="jobIdDisplay" style="font-family:var(--font-mono);font-size:11px;color:var(--muted)"></span>
+              <span class="response-jobid" id="jobIdDisplay"></span>
             </div>
             <div class="response-box" id="responseBox"><span class="response-empty">Response will appear here...</span></div>
           </div>
         </div>
       </div>
 
-      <!-- Job History card -->
+      <!-- Job History -->
       <div class="card">
         <div class="history-header">
-          <div class="card-title" style="margin-bottom:0">Job History</div>
-          <button class="btn-refresh" id="btnRefresh">&#8635; Refresh</button>
+          <div class="card-label" style="margin-bottom:0">Job History</div>
+          <button class="btn-refresh" id="btnRefresh">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 1v5h5M15 15v-5h-5"/><path d="M2.5 10A6 6 0 0113.3 4.3L15 6M13.5 6A6 6 0 012.7 11.7L1 10"/></svg>
+            Refresh
+          </button>
         </div>
         <div class="job-list" id="jobList">
           <div class="job-list-empty">No jobs yet.</div>
@@ -246,18 +962,20 @@ code[class*="language-"],pre[class*="language-"]{background:var(--bg)!important;
 
     </div>
 
-    <!-- Draggable splitter -->
+    <!-- Splitter -->
     <div class="splitter" id="splitter"></div>
 
-    <!-- Right panel: Getting Started + API Docs + Integration Examples -->
+    <!-- Right panel -->
     <div class="panel-right">
-      <div class="card-title" style="margin-bottom:4px">Getting Started</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">From zero to running in 5 minutes.</div>
+      <div class="section-title">Getting Started</div>
+      <div class="section-desc">From zero to running in 5 minutes.</div>
       <div id="gettingStarted"></div>
-      <div class="card-title" style="margin-top:24px;margin-bottom:12px">API Documentation</div>
+
+      <div class="section-title section-gap">API Documentation</div>
       <div id="apiDocs"></div>
-      <div class="card-title" style="margin-top:24px;margin-bottom:12px">Integration Examples</div>
-      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Ready-to-use code snippets for integrating ClaudeGate into your application.</div>
+
+      <div class="section-title section-gap">Integration Examples</div>
+      <div class="section-desc">Ready-to-use code snippets for integrating ClaudeGate into your application.</div>
       <div id="integrationExamples"></div>
     </div>
 
@@ -268,47 +986,41 @@ code[class*="language-"],pre[class*="language-"]{background:var(--bg)!important;
 (function() {
 'use strict';
 
-// Base URL: strip trailing slash so relative paths work under any proxy prefix
-const base = window.location.pathname.replace(/\/[^/]*$/, '').replace(/\/+$/, '');
-const api = (path) => base + '/' + path.replace(/^\//, '');
+var base = window.location.pathname.replace(/\/[^/]*$/, '').replace(/\/+$/, '');
+function apiUrl(path) { return base + '/' + path.replace(/^\//, ''); }
 
-// ── API Key ──────────────────────────────────────────────────────────────────
-const keyInput = document.getElementById('apiKeyInput');
-const keyStatus = document.getElementById('keyStatus');
-const keyToggle = document.getElementById('keyToggle');
-const btnSave = document.getElementById('btnSave');
+// ── API Key ──
+var keyInput = document.getElementById('apiKeyInput');
+var keyStatus = document.getElementById('keyStatus');
+var keyToggle = document.getElementById('keyToggle');
+var btnSave = document.getElementById('btnSave');
 
-let apiKey = localStorage.getItem('cg_api_key') || '';
+var apiKey = localStorage.getItem('cg_api_key') || '';
 keyInput.value = apiKey;
 
-keyToggle.addEventListener('click', () => {
-  const show = keyInput.type === 'password';
+keyToggle.addEventListener('click', function() {
+  var show = keyInput.type === 'password';
   keyInput.type = show ? 'text' : 'password';
   keyToggle.innerHTML = show ? '&#128064;' : '&#128065;';
 });
 
-btnSave.addEventListener('click', () => {
+btnSave.addEventListener('click', function() {
   apiKey = keyInput.value.trim();
   localStorage.setItem('cg_api_key', apiKey);
   btnSave.textContent = 'Saved!';
-  setTimeout(() => { btnSave.textContent = 'Save'; }, 1500);
+  setTimeout(function() { btnSave.textContent = 'Save'; }, 1500);
   validateKey();
 });
 
-keyInput.addEventListener('keydown', (e) => {
+keyInput.addEventListener('keydown', function(e) {
   if (e.key === 'Enter') btnSave.click();
 });
 
-async function validateKey() {
+function validateKey() {
   if (!apiKey) { setKeyStatus(null); return; }
-  try {
-    const r = await fetch(api('api/v1/jobs?limit=1'), {
-      headers: { 'X-API-Key': apiKey }
-    });
-    setKeyStatus(r.ok);
-  } catch {
-    setKeyStatus(false);
-  }
+  fetch(apiUrl('api/v1/jobs?limit=1'), { headers: { 'X-API-Key': apiKey } })
+    .then(function(r) { setKeyStatus(r.ok); })
+    .catch(function() { setKeyStatus(false); });
 }
 
 function setKeyStatus(valid) {
@@ -318,112 +1030,115 @@ function setKeyStatus(valid) {
 
 if (apiKey) validateKey();
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ──
 function authHeaders(extra) {
   return Object.assign({ 'X-API-Key': apiKey }, extra || {});
 }
 
 function timeAgo(dateStr) {
-  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  var diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
   if (diff < 60) return diff + 's ago';
-  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
-  return Math.floor(diff/86400) + 'd ago';
+  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+  return Math.floor(diff / 86400) + 'd ago';
 }
 
-function statusBadgeHTML(status) {
-  return `<span class="badge badge-${status}">${status}</span>`;
+function badgeHTML(status) {
+  return '<span class="badge badge-' + status + '">' + status + '</span>';
 }
 
-// ── System prompt toggle ─────────────────────────────────────────────────────
-const systemToggleBtn = document.getElementById('systemToggleBtn');
-const systemPrompt = document.getElementById('systemPrompt');
-const systemChevron = document.getElementById('systemChevron');
-let systemOpen = false;
+function escapeHTML(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
-systemToggleBtn.addEventListener('click', () => {
+function highlightJSON(str) {
+  return str
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="json-key">$1</span>:')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="json-str">$1</span>')
+    .replace(/:\s*(-?\d+(?:\.\d+)?)/g, ': <span class="json-num">$1</span>')
+    .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
+    .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>');
+}
+
+// ── System prompt toggle ──
+var systemToggleBtn = document.getElementById('systemToggleBtn');
+var systemPrompt = document.getElementById('systemPrompt');
+var systemOpen = false;
+
+systemToggleBtn.addEventListener('click', function() {
   systemOpen = !systemOpen;
   systemPrompt.classList.toggle('collapsed', !systemOpen);
-  systemChevron.innerHTML = systemOpen ? '&#9660;' : '&#9654;';
+  systemToggleBtn.classList.toggle('open', systemOpen);
 });
 
-// ── Playground ───────────────────────────────────────────────────────────────
-const promptInput = document.getElementById('promptInput');
-const modelSelect = document.getElementById('modelSelect');
-const btnSend = document.getElementById('btnSend');
-const responseBox = document.getElementById('responseBox');
-const statusBadgeEl = document.getElementById('statusBadge');
-const jobIdDisplay = document.getElementById('jobIdDisplay');
-
-let activeSSE = null;
+// ── Playground ──
+var promptInput = document.getElementById('promptInput');
+var modelSelect = document.getElementById('modelSelect');
+var btnSend = document.getElementById('btnSend');
+var responseBox = document.getElementById('responseBox');
+var statusBadgeEl = document.getElementById('statusBadge');
+var jobIdDisplay = document.getElementById('jobIdDisplay');
+var activeSSE = null;
 
 btnSend.addEventListener('click', sendJob);
 
-async function sendJob() {
-  const prompt = promptInput.value.trim();
+function sendJob() {
+  var prompt = promptInput.value.trim();
   if (!prompt) { promptInput.focus(); return; }
   if (!apiKey) { alert('Please enter and save your API key first.'); return; }
 
-  if (activeSSE) { activeSSE.close(); activeSSE = null; }
+  if (activeSSE) { activeSSE.abort(); activeSSE = null; }
 
   btnSend.disabled = true;
   responseBox.innerHTML = '';
-  statusBadgeEl.innerHTML = statusBadgeHTML('queued');
+  statusBadgeEl.innerHTML = badgeHTML('queued');
   jobIdDisplay.textContent = '';
 
-  const body = { prompt, model: modelSelect.value };
-  const sp = systemPrompt.value.trim();
+  var body = { prompt: prompt, model: modelSelect.value };
+  var sp = systemPrompt.value.trim();
   if (sp) body.system_prompt = sp;
   if (document.getElementById('jsonMode').checked) body.response_format = 'json';
 
-  let jobId;
-  try {
-    const r = await fetch(api('api/v1/jobs'), {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body)
-    });
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({ error: r.statusText }));
-      showError('Failed to create job: ' + (err.error || r.statusText));
+  fetch(apiUrl('api/v1/jobs'), {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body)
+  }).then(function(r) {
+    if (!r.ok) return r.json().catch(function() { return { error: r.statusText }; }).then(function(e) {
+      showError('Failed to create job: ' + (e.error || r.statusText));
       btnSend.disabled = false;
-      return;
-    }
-    const job = await r.json();
-    jobId = job.job_id;
-    jobIdDisplay.textContent = '#' + jobId.slice(0, 8);
-  } catch (e) {
+    });
+    return r.json().then(function(job) {
+      jobIdDisplay.textContent = '#' + job.job_id.slice(0, 8);
+      openSSE(job.job_id);
+    });
+  }).catch(function(e) {
     showError('Network error: ' + e.message);
     btnSend.disabled = false;
-    return;
-  }
-
-  // Open SSE stream
-  openSSE(jobId);
+  });
 }
 
 function openSSE(jobId) {
-  const url = api('api/v1/jobs/' + jobId + '/sse');
-  // EventSource doesn't support custom headers — use fetch with ReadableStream
-  const ctrl = new AbortController();
+  var ctrl = new AbortController();
   activeSSE = ctrl;
 
-  fetch(url, { headers: authHeaders(), signal: ctrl.signal })
-    .then(r => {
-      if (!r.ok) return r.json().then(e => { throw new Error(e.error || r.statusText); });
-      const reader = r.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
+  fetch(apiUrl('api/v1/jobs/' + jobId + '/sse'), { headers: authHeaders(), signal: ctrl.signal })
+    .then(function(r) {
+      if (!r.ok) return r.json().then(function(e) { throw new Error(e.error || r.statusText); });
+      var reader = r.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = '';
 
       function pump() {
-        reader.read().then(({ done, value }) => {
-          if (done) { btnSend.disabled = false; loadHistory(); return; }
-          buf += decoder.decode(value, { stream: true });
-          const parts = buf.split('\n\n');
+        reader.read().then(function(chunk) {
+          if (chunk.done) { btnSend.disabled = false; loadHistory(); return; }
+          buf += decoder.decode(chunk.value, { stream: true });
+          var parts = buf.split('\n\n');
           buf = parts.pop();
           parts.forEach(parseSSEChunk);
           pump();
-        }).catch(e => {
+        }).catch(function(e) {
           if (e.name !== 'AbortError') showError('Stream error: ' + e.message);
           btnSend.disabled = false;
           loadHistory();
@@ -431,27 +1146,27 @@ function openSSE(jobId) {
       }
       pump();
     })
-    .catch(e => {
+    .catch(function(e) {
       if (e.name !== 'AbortError') showError('SSE error: ' + e.message);
       btnSend.disabled = false;
     });
 }
 
 function parseSSEChunk(raw) {
-  const lines = raw.split('\n');
-  let eventName = '', dataStr = '';
-  for (const line of lines) {
-    if (line.startsWith('event: ')) eventName = line.slice(7).trim();
-    else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
+  var lines = raw.split('\n');
+  var eventName = '', dataStr = '';
+  for (var k = 0; k < lines.length; k++) {
+    if (lines[k].startsWith('event: ')) eventName = lines[k].slice(7).trim();
+    else if (lines[k].startsWith('data: ')) dataStr = lines[k].slice(6).trim();
   }
   if (!dataStr) return;
-  let data;
-  try { data = JSON.parse(dataStr); } catch { return; }
+  var data;
+  try { data = JSON.parse(dataStr); } catch (e) { return; }
 
   if (eventName === 'status') {
-    statusBadgeEl.innerHTML = statusBadgeHTML(data.status || 'queued');
+    statusBadgeEl.innerHTML = badgeHTML(data.status || 'queued');
   } else if (eventName === 'chunk') {
-    const chunk = data.chunk || data.text || data;
+    var chunk = data.chunk || data.text || data;
     if (typeof chunk === 'string') {
       if (!responseBox.dataset.streaming) {
         responseBox.textContent = '';
@@ -462,14 +1177,11 @@ function parseSSEChunk(raw) {
     }
   } else if (eventName === 'result') {
     delete responseBox.dataset.streaming;
-    statusBadgeEl.innerHTML = statusBadgeHTML(data.status || 'completed');
+    statusBadgeEl.innerHTML = badgeHTML(data.status || 'completed');
     if (data.result) {
       if (document.getElementById('jsonMode').checked) {
-        try {
-          responseBox.textContent = JSON.stringify(JSON.parse(data.result), null, 2);
-        } catch {
-          responseBox.textContent = data.result;
-        }
+        try { responseBox.textContent = JSON.stringify(JSON.parse(data.result), null, 2); }
+        catch (e) { responseBox.textContent = data.result; }
       } else {
         responseBox.textContent = data.result;
       }
@@ -484,13 +1196,13 @@ function parseSSEChunk(raw) {
 }
 
 function showError(msg) {
-  statusBadgeEl.innerHTML = statusBadgeHTML('failed');
+  statusBadgeEl.innerHTML = badgeHTML('failed');
   responseBox.textContent = msg;
 }
 
 function showJobResult(job) {
   jobIdDisplay.textContent = '#' + job.job_id.slice(0, 8);
-  statusBadgeEl.innerHTML = statusBadgeHTML(job.status);
+  statusBadgeEl.innerHTML = badgeHTML(job.status);
   if (job.result) {
     responseBox.textContent = job.result;
   } else if (job.error) {
@@ -500,22 +1212,21 @@ function showJobResult(job) {
   }
 }
 
-// ── Job History ───────────────────────────────────────────────────────────────
-const jobList = document.getElementById('jobList');
-const btnRefresh = document.getElementById('btnRefresh');
-
+// ── Job History ──
+var jobList = document.getElementById('jobList');
+var btnRefresh = document.getElementById('btnRefresh');
 btnRefresh.addEventListener('click', loadHistory);
 
-async function loadHistory() {
-  try {
-    const r = await fetch(api('api/v1/jobs?limit=10'), { headers: authHeaders() });
-    if (!r.ok) return;
-    const data = await r.json();
-    renderHistory(data.jobs || []);
-    setKeyStatus(true);
-  } catch (e) {
-    console.error('Failed to load history:', e);
-  }
+function loadHistory() {
+  if (!apiKey) return;
+  fetch(apiUrl('api/v1/jobs?limit=10'), { headers: authHeaders() })
+    .then(function(r) { if (!r.ok) return; return r.json(); })
+    .then(function(data) {
+      if (!data) return;
+      renderHistory(data.jobs || []);
+      setKeyStatus(true);
+    })
+    .catch(function(e) { console.error('Failed to load history:', e); });
 }
 
 function renderHistory(jobs) {
@@ -524,172 +1235,79 @@ function renderHistory(jobs) {
     return;
   }
   jobList.innerHTML = '';
-  jobs.forEach(job => {
-    const item = document.createElement('div');
+  jobs.forEach(function(job) {
+    var item = document.createElement('div');
     item.className = 'job-item';
-    const isTerminal = job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
+    var isTerminal = job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
     item.innerHTML =
-      `<span class="job-id">#${job.job_id.slice(0,8)}</span>` +
-      `<span class="job-model">${job.model}</span>` +
-      statusBadgeHTML(job.status) +
-      `<span class="job-time">${timeAgo(job.created_at)}</span>` +
-      (!isTerminal ? `<button class="btn-cancel" data-id="${job.job_id}" title="Cancel job" style="background:none;color:var(--muted);padding:2px 5px;font-size:13px;flex-shrink:0;border-radius:3px;cursor:pointer;border:none">&#9632;</button>` : '') +
-      `<button class="btn-delete" data-id="${job.job_id}" title="Delete job">&#128465;</button>`;
-    const cancelBtn = item.querySelector('.btn-cancel');
+      '<span class="job-id-short">#' + job.job_id.slice(0, 8) + '</span>' +
+      '<span class="job-model">' + job.model + '</span>' +
+      badgeHTML(job.status) +
+      '<span class="job-time">' + timeAgo(job.created_at) + '</span>' +
+      (!isTerminal ? '<button class="btn-action-sm" data-cancel="' + job.job_id + '" title="Cancel">&#9632;</button>' : '') +
+      '<button class="btn-action-sm danger" data-delete="' + job.job_id + '" title="Delete">&#128465;</button>';
+
+    var cancelBtn = item.querySelector('[data-cancel]');
     if (cancelBtn) {
-      cancelBtn.addEventListener('click', async (e) => {
+      cancelBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        await cancelJob(job.job_id);
+        cancelJob(job.job_id);
       });
     }
-    item.querySelector('.btn-delete').addEventListener('click', async (e) => {
+    item.querySelector('[data-delete]').addEventListener('click', function(e) {
       e.stopPropagation();
-      await deleteJob(job.job_id);
+      deleteJob(job.job_id);
     });
-    item.addEventListener('click', () => showJobResult(job));
+    item.addEventListener('click', function() { showJobResult(job); });
     jobList.appendChild(item);
   });
 }
 
-async function deleteJob(id) {
-  try {
-    await fetch(api('api/v1/jobs/' + id), {
-      method: 'DELETE',
-      headers: authHeaders()
-    });
-  } catch (e) {
-    console.error('Failed to delete job:', e);
-  }
-  loadHistory();
+function deleteJob(id) {
+  fetch(apiUrl('api/v1/jobs/' + id), { method: 'DELETE', headers: authHeaders() })
+    .catch(function(e) { console.error('Failed to delete job:', e); })
+    .then(loadHistory);
 }
 
-async function cancelJob(id) {
-  try {
-    await fetch(api('api/v1/jobs/' + id + '/cancel'), {
-      method: 'POST',
-      headers: authHeaders()
-    });
-  } catch (e) {
-    console.error('Failed to cancel job:', e);
-  }
-  loadHistory();
+function cancelJob(id) {
+  fetch(apiUrl('api/v1/jobs/' + id + '/cancel'), { method: 'POST', headers: authHeaders() })
+    .catch(function(e) { console.error('Failed to cancel job:', e); })
+    .then(loadHistory);
 }
 
-// ── Getting Started Guide ─────────────────────────────────────────────────────
+// ── Getting Started ──
 var steps = [
-  {
-    label: '1',
-    title: 'Install Claude Code CLI',
-    code: [
-      '# Requires Node.js 18+',
-      'npm install -g @anthropic-ai/claude-code',
-      '',
-      '# Authenticate with your Anthropic account',
-      'claude'
-    ].join('\n')
-  },
-  {
-    label: '2',
-    title: 'Install Go',
-    code: [
-      '# Install mise (version manager)',
-      'curl https://mise.run | sh',
-      'echo \'eval "$(~/.local/bin/mise activate bash)"\' >> ~/.bashrc',
-      'source ~/.bashrc',
-      '',
-      '# Install Go',
-      'mise use -g go@latest'
-    ].join('\n')
-  },
-  {
-    label: '3',
-    title: 'Build',
-    code: [
-      'git clone https://github.com/ohugonnot/claudegate.git',
-      'cd claudegate',
-      'make build'
-    ].join('\n')
-  },
-  {
-    label: '4',
-    title: 'Configure',
-    code: [
-      'cp .env.example .env',
-      '# Edit .env — set at minimum:',
-      '#   CLAUDEGATE_API_KEYS=<your-secret-key>',
-      '#   CLAUDEGATE_CLAUDE_PATH=$(which claude)'
-    ].join('\n')
-  },
-  {
-    label: '5',
-    title: 'Run & Test',
-    code: [
-      './bin/claudegate',
-      '',
-      '# Test: curl http://localhost:8080/api/v1/health',
-      '# Then open http://localhost:8080/ in your browser'
-    ].join('\n')
-  },
-  {
-    label: '6',
-    title: 'Reverse Proxy (optional)',
-    code: [
-      '# Bind to localhost in .env:',
-      '#   CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8080',
-      '',
-      '# ── Apache ──────────────────────────',
-      '# sudo a2enmod proxy proxy_http headers',
-      '# Add to your VirtualHost:',
-      'ProxyPass        /claudegate/ http://127.0.0.1:8080/ flushpackets=on',
-      'ProxyPassReverse /claudegate/ http://127.0.0.1:8080/',
-      '',
-      '# ── Nginx ───────────────────────────',
-      '# Add to your server block:',
-      'location /claudegate/ {',
-      '    proxy_pass http://127.0.0.1:8080/;',
-      '    proxy_buffering off;  # critical for SSE',
-      '    proxy_cache off;',
-      '    proxy_read_timeout 300s;',
-      '}',
-      '',
-      '# ── Caddy ───────────────────────────',
-      '# handle_path /claudegate/* {',
-      '#     reverse_proxy localhost:8080',
-      '# }'
-    ].join('\n')
-  }
+  { label: '1', title: 'Install Claude Code CLI', code: '# Requires Node.js 18+\nnpm install -g @anthropic-ai/claude-code\n\n# Authenticate with your Anthropic account\nclaude' },
+  { label: '2', title: 'Install Go', code: '# Install mise (version manager)\ncurl https://mise.run | sh\necho \'eval \"$(~/.local/bin/mise activate bash)\"\' >> ~/.bashrc\nsource ~/.bashrc\n\n# Install Go\nmise use -g go@latest' },
+  { label: '3', title: 'Build', code: 'git clone https://github.com/ohugonnot/claudegate.git\ncd claudegate\nmake build' },
+  { label: '4', title: 'Configure', code: 'cp .env.example .env\n# Edit .env \u2014 set at minimum:\n#   CLAUDEGATE_API_KEYS=<your-secret-key>\n#   CLAUDEGATE_CLAUDE_PATH=$(which claude)' },
+  { label: '5', title: 'Run & Test', code: './bin/claudegate\n\n# Test: curl http://localhost:8080/api/v1/health\n# Then open http://localhost:8080/ in your browser' },
+  { label: '6', title: 'Reverse Proxy (optional)', code: '# Bind to localhost in .env:\n#   CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8080\n\n# \u2500\u2500 Apache \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# sudo a2enmod proxy proxy_http headers\n# Add to your VirtualHost:\nProxyPass        /claudegate/ http://127.0.0.1:8080/ flushpackets=on\nProxyPassReverse /claudegate/ http://127.0.0.1:8080/\n\n# \u2500\u2500 Nginx \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# Add to your server block:\nlocation /claudegate/ {\n    proxy_pass http://127.0.0.1:8080/;\n    proxy_buffering off;  # critical for SSE\n    proxy_cache off;\n    proxy_read_timeout 300s;\n}\n\n# \u2500\u2500 Caddy \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n# handle_path /claudegate/* {\n#     reverse_proxy localhost:8080\n# }' }
 ];
 
 function buildGuide() {
   var container = document.getElementById('gettingStarted');
   steps.forEach(function(step, i) {
-    var idx = 'step-' + i;
     var div = document.createElement('div');
-    div.className = 'endpoint';
-
+    div.className = 'collapse-item';
     div.innerHTML =
-      '<div class="endpoint-head" data-stepidx="' + i + '">' +
-        '<span class="method method-step">' + step.label + '</span>' +
-        '<span class="path" style="font-family:inherit;font-size:13px">' + step.title + '</span>' +
-        '<span class="chevron">&#9654;</span>' +
+      '<div class="collapse-head">' +
+        '<span class="method-badge method-step">' + step.label + '</span>' +
+        '<span class="collapse-path non-mono">' + step.title + '</span>' +
+        '<span class="collapse-chevron">&#9654;</span>' +
       '</div>' +
-      '<div class="endpoint-body" id="' + idx + '-body">' +
-        '<div>' +
-          '<div class="code-block" style="position:relative">' +
-            '<button class="btn-copy" id="' + idx + '-copy">Copy</button>' +
-            '<pre><code class="language-bash">' + escapeHTML(step.code) + '</code></pre>' +
-          '</div>' +
-        '</div>' +
+      '<div class="collapse-body">' +
+        '<div class="code-block"><button class="btn-copy">Copy</button><pre><code class="language-bash">' + escapeHTML(step.code) + '</code></pre></div>' +
       '</div>';
 
-    div.querySelector('.endpoint-head').addEventListener('click', function() {
-      var body = div.querySelector('.endpoint-body');
-      var chevron = div.querySelector('.chevron');
+    div.querySelector('.collapse-head').addEventListener('click', function() {
+      var body = div.querySelector('.collapse-body');
+      var chev = div.querySelector('.collapse-chevron');
       var open = body.classList.toggle('open');
-      chevron.style.transform = open ? 'rotate(90deg)' : '';
+      chev.style.transform = open ? 'rotate(90deg)' : '';
     });
 
-    div.querySelector('#' + idx + '-copy').addEventListener('click', function(e) {
+    div.querySelector('.btn-copy').addEventListener('click', function(e) {
       e.stopPropagation();
       navigator.clipboard.writeText(step.code).then(function() {
         e.target.textContent = 'Copied!';
@@ -701,177 +1319,131 @@ function buildGuide() {
   });
 }
 
-// ── API Documentation ─────────────────────────────────────────────────────────
-const endpoints = [
+// ── API Documentation ──
+var endpoints = [
   {
     method: 'POST', path: '/api/v1/jobs',
-    desc: 'Submit a new job. Returns 202 Accepted with the created job object.',
-    curl: `curl -X POST https://example.com/api/v1/jobs \\
-  -H "X-API-Key: your-key" \\
-  -H "Content-Type: application/json" \\
-  -d '{"prompt": "Explain what a mutex is.", "model": "haiku", "system_prompt": "Be concise.", "response_format": "json"}'`,
-    response: `{
-  "job_id": "a1b2c3d4-e5f6-...",
-  "prompt": "Explain what a mutex is.",
-  "model": "haiku",
-  "status": "queued",
-  "created_at": "2025-01-01T00:00:00Z"
-}`,
+    desc: 'Submit a new job. Returns 202 Accepted.<br><br>' +
+'<strong>Parameters:</strong><br>' +
+'<code>prompt</code> <em>(required)</em> — text prompt to send to Claude<br>' +
+'<code>model</code> — haiku (default), sonnet, or opus<br>' +
+'<code>system_prompt</code> — custom system instruction<br>' +
+'<code>callback_url</code> — webhook URL, receives the result when done<br>' +
+'<code>response_format</code> — text (default) or json<br>' +
+'<code>metadata</code> — arbitrary JSON, returned as-is',
+    curl: "curl -X POST https://example.com/api/v1/jobs \\\n  -H \"X-API-Key: your-key\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"prompt\": \"Explain what a mutex is.\", \"model\": \"haiku\", \"system_prompt\": \"Be concise.\", \"response_format\": \"json\", \"callback_url\": \"https://example.com/webhook\", \"metadata\": {\"user_id\": 42}}'",
+    response: '{\n  "job_id": "a1b2c3d4-e5f6-...",\n  "prompt": "Explain what a mutex is.",\n  "model": "haiku",\n  "status": "queued",\n  "response_format": "json",\n  "metadata": {"user_id": 42},\n  "created_at": "2025-01-01T00:00:00Z"\n}',
     tryit: { type: 'post-job' }
   },
   {
     method: 'GET', path: '/api/v1/jobs',
-    desc: 'List jobs with pagination. Query params: limit (default 20), offset (default 0).',
-    curl: `curl "https://example.com/api/v1/jobs?limit=10&offset=0" \\
-  -H "X-API-Key: your-key"`,
-    response: `{
-  "jobs": [ { "job_id": "...", "status": "completed", ... } ],
-  "total": 42,
-  "limit": 10,
-  "offset": 0
-}`,
+    desc: 'List jobs with pagination. Returns 200 OK.<br><br>' +
+'<strong>Query parameters:</strong><br>' +
+'<code>limit</code> — number of jobs to return, default 20 (max 100)<br>' +
+'<code>offset</code> — number of jobs to skip, default 0',
+    curl: "curl \"https://example.com/api/v1/jobs?limit=10&offset=0\" \\\n  -H \"X-API-Key: your-key\"",
+    response: '{\n  "jobs": [ { "job_id": "...", "status": "completed", ... } ],\n  "total": 42,\n  "limit": 10,\n  "offset": 0\n}',
     tryit: { type: 'list-jobs' }
   },
   {
     method: 'GET', path: '/api/v1/jobs/{id}',
-    desc: 'Poll a job\'s status and result.',
-    curl: `curl "https://example.com/api/v1/jobs/a1b2c3d4-..." \\
-  -H "X-API-Key: your-key"`,
-    response: `{
-  "job_id": "a1b2c3d4-...",
-  "model": "haiku",
-  "status": "completed",
-  "result": "A mutex ensures exclusive access to a shared resource.",
-  "created_at": "2025-01-01T00:00:00Z",
-  "started_at": "2025-01-01T00:00:00.1Z",
-  "completed_at": "2025-01-01T00:00:02Z"
-}`,
+    desc: 'Poll a job\'s status and result. Returns 200 OK or 404 if not found.<br><br>' +
+'<strong>Path parameters:</strong><br>' +
+'<code>id</code> <em>(required)</em> — job UUID returned by the POST endpoint',
+    curl: "curl \"https://example.com/api/v1/jobs/a1b2c3d4-...\" \\\n  -H \"X-API-Key: your-key\"",
+    response: '{\n  "job_id": "a1b2c3d4-...",\n  "model": "haiku",\n  "status": "completed",\n  "result": "A mutex ensures exclusive access to a shared resource.",\n  "created_at": "2025-01-01T00:00:00Z",\n  "started_at": "2025-01-01T00:00:00.1Z",\n  "completed_at": "2025-01-01T00:00:02Z"\n}',
     tryit: { type: 'get-job' }
   },
   {
     method: 'GET', path: '/api/v1/jobs/{id}/sse',
-    desc: 'Stream job progress via Server-Sent Events. Events: status, chunk, result. Connection closes when job finishes.',
-    curl: `curl -N "https://example.com/api/v1/jobs/a1b2c3d4-.../sse" \\
-  -H "X-API-Key: your-key"`,
-    response: `event: status
-data: {"job_id":"...","status":"processing"}
-
-event: chunk
-data: {"text":"A mutex "}
-
-event: result
-data: {"job_id":"...","status":"completed","result":"A mutex..."}`,
+    desc: 'Stream job progress via Server-Sent Events. Connection closes when job finishes.<br><br>' +
+'<strong>Path parameters:</strong><br>' +
+'<code>id</code> <em>(required)</em> — job UUID to stream<br><br>' +
+'<strong>Events:</strong> status, chunk, result',
+    curl: "curl -N \"https://example.com/api/v1/jobs/a1b2c3d4-.../sse\" \\\n  -H \"X-API-Key: your-key\"",
+    response: 'event: status\ndata: {"job_id":"...","status":"processing"}\n\nevent: chunk\ndata: {"text":"A mutex "}\n\nevent: result\ndata: {"job_id":"...","status":"completed","result":"A mutex..."}',
     tryit: { type: 'sse-job' }
   },
   {
     method: 'DELETE', path: '/api/v1/jobs/{id}',
-    desc: 'Delete a job record. Returns 204 No Content.',
-    curl: `curl -X DELETE "https://example.com/api/v1/jobs/a1b2c3d4-..." \\
-  -H "X-API-Key: your-key"`,
-    response: `HTTP/1.1 204 No Content`,
+    desc: 'Delete a job record. Returns 204 No Content or 404 if not found.<br><br>' +
+'<strong>Path parameters:</strong><br>' +
+'<code>id</code> <em>(required)</em> — job UUID to delete',
+    curl: "curl -X DELETE \"https://example.com/api/v1/jobs/a1b2c3d4-...\" \\\n  -H \"X-API-Key: your-key\"",
+    response: 'HTTP/1.1 204 No Content',
     tryit: { type: 'delete-job' }
   },
   {
     method: 'POST', path: '/api/v1/jobs/{id}/cancel',
-    desc: 'Cancel a queued or processing job. Returns 200 with cancelled status. Returns 409 if the job is already in a terminal state (completed, failed, cancelled).',
-    curl: `curl -X POST "https://example.com/api/v1/jobs/a1b2c3d4-.../cancel" \\
-  -H "X-API-Key: your-key"`,
-    response: `{
-  "status": "cancelled"
-}`,
+    desc: 'Cancel a queued or processing job. Returns 200 OK or 409 Conflict if already terminal.<br><br>' +
+'<strong>Path parameters:</strong><br>' +
+'<code>id</code> <em>(required)</em> — job UUID to cancel',
+    curl: "curl -X POST \"https://example.com/api/v1/jobs/a1b2c3d4-.../cancel\" \\\n  -H \"X-API-Key: your-key\"",
+    response: '{\n  "status": "cancelled"\n}',
     tryit: { type: 'cancel-job' }
   },
   {
     method: 'GET', path: '/api/v1/health',
     desc: 'Health check. No authentication required.',
-    curl: `curl "https://example.com/api/v1/health"`,
-    response: `{"status": "ok"}`,
+    curl: 'curl "https://example.com/api/v1/health"',
+    response: '{"status": "ok"}',
     tryit: { type: 'health' }
   }
 ];
 
-function highlightJSON(str) {
-  return str
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="json-key">$1</span>:')
-    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="json-str">$1</span>')
-    .replace(/:\s*(-?\d+(?:\.\d+)?)/g, ': <span class="json-num">$1</span>')
-    .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
-    .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>');
-}
-
 function buildTryitHTML(ep, i) {
-  const t = ep.tryit.type;
+  var t = ep.tryit.type;
   var fields = '';
 
   if (t === 'post-job') {
     fields =
       '<div class="tryit-field">' +
-        '<label>prompt <span style="color:var(--error)">*</span></label>' +
-        '<textarea id="ti-'+i+'-prompt" rows="3" placeholder="Ask something..."></textarea>' +
+        '<label>prompt <span style="color:var(--red)">*</span></label>' +
+        '<textarea id="ti-' + i + '-prompt" rows="3" placeholder="Ask something..."></textarea>' +
       '</div>' +
       '<div class="tryit-row">' +
-        '<div class="tryit-field">' +
-          '<label>model</label>' +
-          '<select id="ti-'+i+'-model">' +
-            '<option value="haiku">claude-haiku</option>' +
-            '<option value="sonnet">claude-sonnet</option>' +
-            '<option value="opus">claude-opus</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="tryit-field">' +
-          '<label>system_prompt</label>' +
-          '<input type="text" id="ti-'+i+'-system" placeholder="optional">' +
-        '</div>' +
-        '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;padding-bottom:7px">' +
-          '<input type="checkbox" id="ti-'+i+'-json"> JSON mode' +
-        '</label>' +
+        '<div class="tryit-field"><label>model</label><select id="ti-' + i + '-model"><option value="haiku">claude-haiku</option><option value="sonnet">claude-sonnet</option><option value="opus">claude-opus</option></select></div>' +
+        '<div class="tryit-field"><label>system_prompt</label><input type="text" id="ti-' + i + '-system" placeholder="optional"></div>' +
+        '<label class="checkbox-wrap" style="padding-bottom:9px"><input type="checkbox" id="ti-' + i + '-json"> JSON</label>' +
       '</div>';
   } else if (t === 'list-jobs') {
     fields =
       '<div class="tryit-row">' +
-        '<div class="tryit-field">' +
-          '<label>limit</label>' +
-          '<input type="number" id="ti-'+i+'-limit" value="20" min="1" max="100">' +
-        '</div>' +
-        '<div class="tryit-field">' +
-          '<label>offset</label>' +
-          '<input type="number" id="ti-'+i+'-offset" value="0" min="0">' +
-        '</div>' +
+        '<div class="tryit-field"><label>limit</label><input type="number" id="ti-' + i + '-limit" value="20" min="1" max="100"></div>' +
+        '<div class="tryit-field"><label>offset</label><input type="number" id="ti-' + i + '-offset" value="0" min="0"></div>' +
       '</div>';
   } else if (t === 'get-job' || t === 'sse-job' || t === 'delete-job' || t === 'cancel-job') {
     fields =
-      '<div class="tryit-field">' +
-        '<label>job_id</label>' +
+      '<div class="tryit-field"><label>job_id</label>' +
         '<div style="display:flex;gap:6px">' +
-          '<input type="text" id="ti-'+i+'-jobid" placeholder="a1b2c3d4-e5f6-..." style="flex:1">' +
-          '<button class="btn-use-latest" id="ti-'+i+'-latest">Use latest</button>' +
+          '<input type="text" id="ti-' + i + '-jobid" placeholder="a1b2c3d4-e5f6-..." style="flex:1">' +
+          '<button class="btn-use-latest" id="ti-' + i + '-latest">Use latest</button>' +
         '</div>' +
       '</div>';
   }
 
-  var cancelBtn = t === 'sse-job' ? '<button class="btn-cancel-sse" id="ti-'+i+'-cancel" style="display:none">&#9632; Cancel</button>' : '';
+  var cancelBtn = t === 'sse-job' ? '<button class="btn-cancel-sse" id="ti-' + i + '-cancel" style="display:none">&#9632; Cancel</button>' : '';
 
   return '<div class="tryit-section">' +
     '<div class="tryit-label">Try it</div>' +
     (fields ? '<div class="tryit-fields">' + fields + '</div>' : '') +
     '<div class="tryit-actions">' +
-      '<button class="btn-tryit" id="ti-'+i+'-btn">&#9654; Send Request</button>' +
+      '<button class="btn-tryit" id="ti-' + i + '-btn">&#9654; Send Request</button>' +
       cancelBtn +
     '</div>' +
-    '<div class="tryit-response" id="ti-'+i+'-resp">' +
+    '<div class="tryit-response" id="ti-' + i + '-resp">' +
       '<div class="tryit-response-meta">' +
-        '<span id="ti-'+i+'-status-badge"></span>' +
-        '<div class="tryit-headers" id="ti-'+i+'-headers" style="display:none"></div>' +
+        '<span id="ti-' + i + '-status-badge"></span>' +
+        '<div class="tryit-headers" id="ti-' + i + '-headers" style="display:none"></div>' +
       '</div>' +
-      '<div class="tryit-body" id="ti-'+i+'-body"></div>' +
+      '<div class="tryit-body" id="ti-' + i + '-body"></div>' +
     '</div>' +
   '</div>';
 }
 
 function getLatestJobId() {
-  const btn = jobList.querySelector('.job-item .btn-delete');
-  return btn ? btn.dataset.id : '';
+  var btn = jobList.querySelector('[data-delete]');
+  return btn ? btn.dataset.delete : '';
 }
 
 function httpBadgeHTML(status) {
@@ -883,20 +1455,13 @@ function httpBadgeHTML(status) {
 }
 
 function showTryitResponse(i, statusCode, headersText, bodyHTML) {
-  var resp = document.getElementById('ti-'+i+'-resp');
-  var badge = document.getElementById('ti-'+i+'-status-badge');
-  var headersEl = document.getElementById('ti-'+i+'-headers');
-  var bodyEl = document.getElementById('ti-'+i+'-body');
-  badge.innerHTML = httpBadgeHTML(statusCode);
-  if (headersText) {
-    headersEl.textContent = headersText;
-    headersEl.style.display = '';
-  } else {
-    headersEl.style.display = 'none';
-  }
-  bodyEl.innerHTML = bodyHTML;
+  var resp = document.getElementById('ti-' + i + '-resp');
+  document.getElementById('ti-' + i + '-status-badge').innerHTML = httpBadgeHTML(statusCode);
+  var headersEl = document.getElementById('ti-' + i + '-headers');
+  if (headersText) { headersEl.textContent = headersText; headersEl.style.display = ''; }
+  else { headersEl.style.display = 'none'; }
+  document.getElementById('ti-' + i + '-body').innerHTML = bodyHTML;
   resp.classList.add('visible');
-  bodyEl.scrollTop = 0;
 }
 
 function extractHeaders(r) {
@@ -909,161 +1474,90 @@ function extractHeaders(r) {
 }
 
 function tryitSend(ep, i) {
-  const t = ep.tryit.type;
-  const btn = document.getElementById('ti-'+i+'-btn');
-  const bodyEl = document.getElementById('ti-'+i+'-body');
-  const resp = document.getElementById('ti-'+i+'-resp');
+  var t = ep.tryit.type;
+  var btn = document.getElementById('ti-' + i + '-btn');
+  var bodyEl = document.getElementById('ti-' + i + '-body');
+  var resp = document.getElementById('ti-' + i + '-resp');
 
-  if (!apiKey && t !== 'health') {
-    alert('Please enter and save your API key first.');
-    return;
-  }
-
+  if (!apiKey && t !== 'health') { alert('Please enter and save your API key first.'); return; }
   btn.disabled = true;
 
   if (t === 'post-job') {
-    const prompt = document.getElementById('ti-'+i+'-prompt').value.trim();
-    if (!prompt) { document.getElementById('ti-'+i+'-prompt').focus(); btn.disabled = false; return; }
-    const body = { prompt, model: document.getElementById('ti-'+i+'-model').value };
-    const sp = document.getElementById('ti-'+i+'-system').value.trim();
+    var prompt = document.getElementById('ti-' + i + '-prompt').value.trim();
+    if (!prompt) { document.getElementById('ti-' + i + '-prompt').focus(); btn.disabled = false; return; }
+    var body = { prompt: prompt, model: document.getElementById('ti-' + i + '-model').value };
+    var sp = document.getElementById('ti-' + i + '-system').value.trim();
     if (sp) body.system_prompt = sp;
-    if (document.getElementById('ti-'+i+'-json').checked) body.response_format = 'json';
-
-    fetch(api('api/v1/jobs'), {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(body)
-    }).then(function(r) {
-      var hdr = extractHeaders(r);
-      return r.text().then(function(txt) {
-        var highlighted;
-        try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
-        catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-        showTryitResponse(i, r.status, hdr, highlighted);
-        btn.disabled = false;
-        if (r.ok) loadHistory();
-      });
-    }).catch(function(e) {
-      resp.classList.add('visible');
-      bodyEl.textContent = 'Network error: ' + e.message;
-      btn.disabled = false;
-    });
+    if (document.getElementById('ti-' + i + '-json').checked) body.response_format = 'json';
+    fetch(apiUrl('api/v1/jobs'), { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body) })
+      .then(function(r) { var hdr = extractHeaders(r); return r.text().then(function(txt) {
+        var h; try { h = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); } catch(e) { h = escapeHTML(txt); }
+        showTryitResponse(i, r.status, hdr, h); btn.disabled = false; if (r.ok) loadHistory();
+      }); })
+      .catch(function(e) { resp.classList.add('visible'); bodyEl.textContent = 'Network error: ' + e.message; btn.disabled = false; });
 
   } else if (t === 'list-jobs') {
-    const limit = document.getElementById('ti-'+i+'-limit').value || '20';
-    const offset = document.getElementById('ti-'+i+'-offset').value || '0';
-    fetch(api('api/v1/jobs?limit=' + limit + '&offset=' + offset), {
-      headers: authHeaders()
-    }).then(function(r) {
-      var hdr = extractHeaders(r);
-      return r.text().then(function(txt) {
-        var highlighted;
-        try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
-        catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-        showTryitResponse(i, r.status, hdr, highlighted);
-        btn.disabled = false;
-      });
-    }).catch(function(e) {
-      resp.classList.add('visible');
-      bodyEl.textContent = 'Network error: ' + e.message;
-      btn.disabled = false;
-    });
+    var limit = document.getElementById('ti-' + i + '-limit').value || '20';
+    var offset = document.getElementById('ti-' + i + '-offset').value || '0';
+    fetch(apiUrl('api/v1/jobs?limit=' + limit + '&offset=' + offset), { headers: authHeaders() })
+      .then(function(r) { var hdr = extractHeaders(r); return r.text().then(function(txt) {
+        var h; try { h = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); } catch(e) { h = escapeHTML(txt); }
+        showTryitResponse(i, r.status, hdr, h); btn.disabled = false;
+      }); })
+      .catch(function(e) { resp.classList.add('visible'); bodyEl.textContent = 'Network error: ' + e.message; btn.disabled = false; });
 
   } else if (t === 'get-job') {
-    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
-    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
-    fetch(api('api/v1/jobs/' + jobId), { headers: authHeaders() })
-      .then(function(r) {
-        var hdr = extractHeaders(r);
-        return r.text().then(function(txt) {
-          var highlighted;
-          try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
-          catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-          showTryitResponse(i, r.status, hdr, highlighted);
-          btn.disabled = false;
-        });
-      }).catch(function(e) {
-        resp.classList.add('visible');
-        bodyEl.textContent = 'Network error: ' + e.message;
-        btn.disabled = false;
-      });
+    var jobId = document.getElementById('ti-' + i + '-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-' + i + '-jobid').focus(); btn.disabled = false; return; }
+    fetch(apiUrl('api/v1/jobs/' + jobId), { headers: authHeaders() })
+      .then(function(r) { var hdr = extractHeaders(r); return r.text().then(function(txt) {
+        var h; try { h = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); } catch(e) { h = escapeHTML(txt); }
+        showTryitResponse(i, r.status, hdr, h); btn.disabled = false;
+      }); })
+      .catch(function(e) { resp.classList.add('visible'); bodyEl.textContent = 'Network error: ' + e.message; btn.disabled = false; });
 
   } else if (t === 'delete-job') {
-    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
-    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
-    fetch(api('api/v1/jobs/' + jobId), { method: 'DELETE', headers: authHeaders() })
-      .then(function(r) {
-        var hdr = extractHeaders(r);
-        return r.text().then(function(txt) {
-          var body204 = r.status === 204 ? '(no content)' : (txt || '');
-          showTryitResponse(i, r.status, hdr, body204.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
-          btn.disabled = false;
-          if (r.ok) loadHistory();
-        });
-      }).catch(function(e) {
-        resp.classList.add('visible');
-        bodyEl.textContent = 'Network error: ' + e.message;
-        btn.disabled = false;
-      });
+    var jobId = document.getElementById('ti-' + i + '-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-' + i + '-jobid').focus(); btn.disabled = false; return; }
+    fetch(apiUrl('api/v1/jobs/' + jobId), { method: 'DELETE', headers: authHeaders() })
+      .then(function(r) { var hdr = extractHeaders(r); return r.text().then(function(txt) {
+        var b = r.status === 204 ? '(no content)' : (txt || '');
+        showTryitResponse(i, r.status, hdr, escapeHTML(b)); btn.disabled = false; if (r.ok) loadHistory();
+      }); })
+      .catch(function(e) { resp.classList.add('visible'); bodyEl.textContent = 'Network error: ' + e.message; btn.disabled = false; });
 
   } else if (t === 'cancel-job') {
-    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
-    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
-    fetch(api('api/v1/jobs/' + jobId + '/cancel'), { method: 'POST', headers: authHeaders() })
-      .then(function(r) {
-        var hdr = extractHeaders(r);
-        return r.text().then(function(txt) {
-          var highlighted;
-          try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
-          catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-          showTryitResponse(i, r.status, hdr, highlighted);
-          btn.disabled = false;
-          if (r.ok) loadHistory();
-        });
-      }).catch(function(e) {
-        resp.classList.add('visible');
-        bodyEl.textContent = 'Network error: ' + e.message;
-        btn.disabled = false;
-      });
+    var jobId = document.getElementById('ti-' + i + '-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-' + i + '-jobid').focus(); btn.disabled = false; return; }
+    fetch(apiUrl('api/v1/jobs/' + jobId + '/cancel'), { method: 'POST', headers: authHeaders() })
+      .then(function(r) { var hdr = extractHeaders(r); return r.text().then(function(txt) {
+        var h; try { h = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); } catch(e) { h = escapeHTML(txt); }
+        showTryitResponse(i, r.status, hdr, h); btn.disabled = false; if (r.ok) loadHistory();
+      }); })
+      .catch(function(e) { resp.classList.add('visible'); bodyEl.textContent = 'Network error: ' + e.message; btn.disabled = false; });
 
   } else if (t === 'sse-job') {
-    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
-    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
-    const cancelBtn = document.getElementById('ti-'+i+'-cancel');
+    var jobId = document.getElementById('ti-' + i + '-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-' + i + '-jobid').focus(); btn.disabled = false; return; }
+    var cancelBtn = document.getElementById('ti-' + i + '-cancel');
     cancelBtn.style.display = '';
     resp.classList.add('visible');
     bodyEl.innerHTML = '';
-    document.getElementById('ti-'+i+'-status-badge').innerHTML = '';
-    document.getElementById('ti-'+i+'-headers').style.display = 'none';
+    document.getElementById('ti-' + i + '-status-badge').innerHTML = '';
+    document.getElementById('ti-' + i + '-headers').style.display = 'none';
 
-    const ctrl = new AbortController();
-    cancelBtn._abort = ctrl;
-    cancelBtn.onclick = function() {
-      ctrl.abort();
-      cancelBtn.style.display = 'none';
-      btn.disabled = false;
-    };
+    var ctrl = new AbortController();
+    cancelBtn.onclick = function() { ctrl.abort(); cancelBtn.style.display = 'none'; btn.disabled = false; };
 
-    fetch(api('api/v1/jobs/' + jobId + '/sse'), { headers: authHeaders(), signal: ctrl.signal })
+    fetch(apiUrl('api/v1/jobs/' + jobId + '/sse'), { headers: authHeaders(), signal: ctrl.signal })
       .then(function(r) {
-        document.getElementById('ti-'+i+'-status-badge').innerHTML = httpBadgeHTML(r.status);
+        document.getElementById('ti-' + i + '-status-badge').innerHTML = httpBadgeHTML(r.status);
         var hdr = extractHeaders(r);
-        if (hdr) {
-          var hdEl = document.getElementById('ti-'+i+'-headers');
-          hdEl.textContent = hdr;
-          hdEl.style.display = '';
-        }
-        if (!r.ok) {
-          return r.text().then(function(txt) {
-            bodyEl.textContent = txt || r.statusText;
-            cancelBtn.style.display = 'none';
-            btn.disabled = false;
-          });
-        }
-        const reader = r.body.getReader();
-        const decoder = new TextDecoder();
+        if (hdr) { var hdEl = document.getElementById('ti-' + i + '-headers'); hdEl.textContent = hdr; hdEl.style.display = ''; }
+        if (!r.ok) return r.text().then(function(txt) { bodyEl.textContent = txt || r.statusText; cancelBtn.style.display = 'none'; btn.disabled = false; });
+        var reader = r.body.getReader();
+        var decoder = new TextDecoder();
         var buf = '';
-
         function pump() {
           reader.read().then(function(chunk) {
             if (chunk.done) { cancelBtn.style.display = 'none'; btn.disabled = false; return; }
@@ -1071,15 +1565,14 @@ function tryitSend(ep, i) {
             var parts = buf.split('\n\n');
             buf = parts.pop();
             parts.forEach(function(raw) {
-              var lines = raw.split('\n');
-              var eventName = '', dataStr = '';
+              var lines = raw.split('\n'), eventName = '', dataStr = '';
               lines.forEach(function(line) {
                 if (line.startsWith('event: ')) eventName = line.slice(7).trim();
                 else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
               });
               if (!dataStr) return;
               var label = document.createElement('div');
-              label.style.cssText = 'color:var(--muted);font-size:11px;margin-top:6px';
+              label.style.cssText = 'color:var(--text-tertiary);font-size:11px;margin-top:6px';
               label.textContent = 'event: ' + eventName;
               var pre = document.createElement('div');
               try { pre.innerHTML = highlightJSON(JSON.stringify(JSON.parse(dataStr), null, 2)); }
@@ -1090,342 +1583,115 @@ function tryitSend(ep, i) {
             });
             pump();
           }).catch(function(e) {
-            if (e.name !== 'AbortError') {
-              var d = document.createElement('div');
-              d.style.color = 'var(--error)';
-              d.textContent = 'Stream error: ' + e.message;
-              bodyEl.appendChild(d);
-            }
-            cancelBtn.style.display = 'none';
-            btn.disabled = false;
+            if (e.name !== 'AbortError') { var d = document.createElement('div'); d.style.color = 'var(--red)'; d.textContent = 'Stream error: ' + e.message; bodyEl.appendChild(d); }
+            cancelBtn.style.display = 'none'; btn.disabled = false;
           });
         }
         pump();
       }).catch(function(e) {
-        if (e.name !== 'AbortError') { bodyEl.textContent = 'SSE error: ' + e.message; }
-        cancelBtn.style.display = 'none';
-        btn.disabled = false;
+        if (e.name !== 'AbortError') bodyEl.textContent = 'SSE error: ' + e.message;
+        cancelBtn.style.display = 'none'; btn.disabled = false;
       });
 
   } else if (t === 'health') {
-    fetch(api('api/v1/health'))
-      .then(function(r) {
-        var hdr = extractHeaders(r);
-        return r.text().then(function(txt) {
-          var highlighted;
-          try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
-          catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-          showTryitResponse(i, r.status, hdr, highlighted);
-          btn.disabled = false;
-        });
-      }).catch(function(e) {
-        resp.classList.add('visible');
-        bodyEl.textContent = 'Network error: ' + e.message;
-        btn.disabled = false;
-      });
+    fetch(apiUrl('api/v1/health'))
+      .then(function(r) { var hdr = extractHeaders(r); return r.text().then(function(txt) {
+        var h; try { h = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); } catch(e) { h = escapeHTML(txt); }
+        showTryitResponse(i, r.status, hdr, h); btn.disabled = false;
+      }); })
+      .catch(function(e) { resp.classList.add('visible'); bodyEl.textContent = 'Network error: ' + e.message; btn.disabled = false; });
   }
 }
 
 function buildDocs() {
-  const container = document.getElementById('apiDocs');
-  endpoints.forEach((ep, i) => {
-    const div = document.createElement('div');
-    div.className = 'endpoint';
-    const mClass = 'method-' + ep.method.toLowerCase();
-    const curlEscaped = ep.curl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const respHighlighted = highlightJSON(ep.response);
+  var container = document.getElementById('apiDocs');
+  endpoints.forEach(function(ep, i) {
+    var div = document.createElement('div');
+    div.className = 'collapse-item';
+    var mClass = 'method-' + ep.method.toLowerCase();
     div.innerHTML =
-      '<div class="endpoint-head" data-idx="'+i+'">' +
-        '<span class="method '+mClass+'">'+ep.method+'</span>' +
-        '<span class="path">'+ep.path+'</span>' +
-        '<span class="chevron">&#9654;</span>' +
+      '<div class="collapse-head">' +
+        '<span class="method-badge ' + mClass + '">' + ep.method + '</span>' +
+        '<span class="collapse-path">' + ep.path + '</span>' +
+        '<span class="collapse-chevron">&#9654;</span>' +
       '</div>' +
-      '<div class="endpoint-body" id="epbody-'+i+'">' +
-        '<div class="endpoint-desc">'+ep.desc+'</div>' +
-        '<div>' +
-          '<div class="code-label">curl example</div>' +
-          '<div class="code-block" style="position:relative">' +
-            '<button class="btn-copy" data-copy="'+i+'">Copy</button>' +
-            '<code>'+curlEscaped+'</code>' +
-          '</div>' +
-        '</div>' +
-        '<div>' +
-          '<div class="code-label">example response</div>' +
-          '<div class="code-block"><code>'+respHighlighted+'</code></div>' +
-        '</div>' +
+      '<div class="collapse-body">' +
+        '<div class="collapse-desc">' + ep.desc + '</div>' +
+        '<div><div class="code-section-label">curl example</div><div class="code-block"><button class="btn-copy" data-copy="' + i + '">Copy</button><code>' + escapeHTML(ep.curl) + '</code></div></div>' +
+        '<div><div class="code-section-label">example response</div><div class="code-block"><code>' + highlightJSON(ep.response) + '</code></div></div>' +
         buildTryitHTML(ep, i) +
       '</div>';
 
-    div.querySelector('.endpoint-head').addEventListener('click', () => {
-      const body = div.querySelector('.endpoint-body');
-      const chevron = div.querySelector('.chevron');
-      const open = body.classList.toggle('open');
-      chevron.style.transform = open ? 'rotate(90deg)' : '';
+    div.querySelector('.collapse-head').addEventListener('click', function() {
+      var body = div.querySelector('.collapse-body');
+      var chev = div.querySelector('.collapse-chevron');
+      var open = body.classList.toggle('open');
+      chev.style.transform = open ? 'rotate(90deg)' : '';
     });
 
-    div.querySelector('.btn-copy').addEventListener('click', async (e) => {
+    div.querySelector('.btn-copy').addEventListener('click', function(e) {
       e.stopPropagation();
-      const idx = parseInt(e.target.dataset.copy);
-      try {
-        await navigator.clipboard.writeText(endpoints[idx].curl);
+      var idx = parseInt(e.target.dataset.copy);
+      navigator.clipboard.writeText(endpoints[idx].curl).then(function() {
         e.target.textContent = 'Copied!';
-        setTimeout(() => { e.target.textContent = 'Copy'; }, 1500);
-      } catch {}
+        setTimeout(function() { e.target.textContent = 'Copy'; }, 1500);
+      }).catch(function() {});
     });
 
-    const tryBtn = div.querySelector('#ti-'+i+'-btn');
-    if (tryBtn) {
-      tryBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        tryitSend(ep, i);
-      });
-    }
+    var tryBtn = div.querySelector('#ti-' + i + '-btn');
+    if (tryBtn) tryBtn.addEventListener('click', function(e) { e.stopPropagation(); tryitSend(ep, i); });
 
-    const latestBtn = div.querySelector('#ti-'+i+'-latest');
-    if (latestBtn) {
-      latestBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        const id = getLatestJobId();
-        if (id) document.getElementById('ti-'+i+'-jobid').value = id;
-        else alert('No jobs in history yet.');
-      });
-    }
+    var latestBtn = div.querySelector('#ti-' + i + '-latest');
+    if (latestBtn) latestBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var id = getLatestJobId();
+      if (id) document.getElementById('ti-' + i + '-jobid').value = id;
+      else alert('No jobs in history yet.');
+    });
 
     container.appendChild(div);
   });
 }
 
-buildGuide();
-buildDocs();
-if (apiKey) loadHistory();
-
-// ── Integration Examples ──────────────────────────────────────────────────────
+// ── Integration Examples ──
 var examples = [
   {
-    label: 'SSE Streaming',
-    lang: 'JavaScript',
-    lang_class: 'javascript',
-    code: [
-      '// Submit a job then stream the response in real-time',
-      '// Works in both browser and Node.js (Node 18+)',
-      '',
-      'const BASE_URL = \'https://example.com\';',
-      'const API_KEY  = \'your-api-key\';',
-      '',
-      'async function streamJob(prompt) {',
-      '  // 1. Create the job',
-      '  const createRes = await fetch(`${BASE_URL}/api/v1/jobs`, {',
-      '    method: \'POST\',',
-      '    headers: {',
-      '      \'X-API-Key\': API_KEY,',
-      '      \'Content-Type\': \'application/json\'',
-      '    },',
-      '    body: JSON.stringify({ prompt, model: \'haiku\' })',
-      '  });',
-      '  if (!createRes.ok) throw new Error(\'Job creation failed: \' + createRes.status);',
-      '  const { job_id } = await createRes.json();',
-      '',
-      '  // 2. Open SSE stream — EventSource cannot send custom headers,',
-      '  //    so we use fetch + ReadableStream instead.',
-      '  const sseRes = await fetch(`${BASE_URL}/api/v1/jobs/${job_id}/sse`, {',
-      '    headers: { \'X-API-Key\': API_KEY }',
-      '  });',
-      '  if (!sseRes.ok) throw new Error(\'SSE connect failed: \' + sseRes.status);',
-      '',
-      '  const reader  = sseRes.body.getReader();',
-      '  const decoder = new TextDecoder();',
-      '  let buf = \'\';',
-      '',
-      '  while (true) {',
-      '    const { done, value } = await reader.read();',
-      '    if (done) break;',
-      '    buf += decoder.decode(value, { stream: true });',
-      '    const messages = buf.split(\'\\n\\n\');',
-      '    buf = messages.pop(); // keep incomplete tail',
-      '',
-      '    for (const msg of messages) {',
-      '      const eventLine = msg.split(\'\\n\').find(l => l.startsWith(\'event: \'));',
-      '      const dataLine  = msg.split(\'\\n\').find(l => l.startsWith(\'data: \'));',
-      '      if (!dataLine) continue;',
-      '      const event = eventLine ? eventLine.slice(7).trim() : \'\';',
-      '      const data  = JSON.parse(dataLine.slice(6));',
-      '',
-      '      if (event === \'chunk\')  process.stdout.write(data.text || \'\');',
-      '      if (event === \'result\') { console.log(\'\\nDone:\', data.status); break; }',
-      '    }',
-      '  }',
-      '}',
-      '',
-      'streamJob(\'Explain what a mutex is.\').catch(console.error);'
-    ].join('\n')
+    label: 'SSE Streaming', lang: 'JavaScript', lang_class: 'javascript',
+    code: "// Submit a job then stream the response in real-time\n// Works in both browser and Node.js (Node 18+)\n\nconst BASE_URL = 'https://example.com';\nconst API_KEY  = 'your-api-key';\n\nasync function streamJob(prompt) {\n  // 1. Create the job\n  const createRes = await fetch(`${BASE_URL}/api/v1/jobs`, {\n    method: 'POST',\n    headers: {\n      'X-API-Key': API_KEY,\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({ prompt, model: 'haiku' })\n  });\n  if (!createRes.ok) throw new Error('Job creation failed: ' + createRes.status);\n  const { job_id } = await createRes.json();\n\n  // 2. Open SSE stream \u2014 EventSource cannot send custom headers,\n  //    so we use fetch + ReadableStream instead.\n  const sseRes = await fetch(`${BASE_URL}/api/v1/jobs/${job_id}/sse`, {\n    headers: { 'X-API-Key': API_KEY }\n  });\n  if (!sseRes.ok) throw new Error('SSE connect failed: ' + sseRes.status);\n\n  const reader  = sseRes.body.getReader();\n  const decoder = new TextDecoder();\n  let buf = '';\n\n  while (true) {\n    const { done, value } = await reader.read();\n    if (done) break;\n    buf += decoder.decode(value, { stream: true });\n    const messages = buf.split('\\n\\n');\n    buf = messages.pop(); // keep incomplete tail\n\n    for (const msg of messages) {\n      const eventLine = msg.split('\\n').find(l => l.startsWith('event: '));\n      const dataLine  = msg.split('\\n').find(l => l.startsWith('data: '));\n      if (!dataLine) continue;\n      const event = eventLine ? eventLine.slice(7).trim() : '';\n      const data  = JSON.parse(dataLine.slice(6));\n\n      if (event === 'chunk')  process.stdout.write(data.text || '');\n      if (event === 'result') { console.log('\\nDone:', data.status); break; }\n    }\n  }\n}\n\nstreamJob('Explain what a mutex is.').catch(console.error);"
   },
   {
-    label: 'Polling + Webhook',
-    lang: 'PHP',
-    lang_class: 'php',
-    code: [
-      '<?php',
-      '// Create a job with an optional callback_url for webhook delivery.',
-      '// Falls back to polling if no webhook server is available.',
-      '',
-      '$BASE_URL   = \'https://example.com\';',
-      '$API_KEY    = \'your-api-key\';',
-      '$WEBHOOK    = \'https://your-app.example.com/webhook/claudegate\';',
-      '',
-      '// 1. Submit the job',
-      'function createJob(string $prompt): string {',
-      '  global $BASE_URL, $API_KEY, $WEBHOOK;',
-      '  $payload = json_encode([',
-      '    \'prompt\'       => $prompt,',
-      '    \'model\'        => \'haiku\',',
-      '    \'callback_url\' => $WEBHOOK,   // optional — remove if not using webhooks',
-      '  ]);',
-      '  $ch = curl_init("$BASE_URL/api/v1/jobs");',
-      '  curl_setopt_array($ch, [',
-      '    CURLOPT_RETURNTRANSFER => true,',
-      '    CURLOPT_POST           => true,',
-      '    CURLOPT_POSTFIELDS     => $payload,',
-      '    CURLOPT_HTTPHEADER     => [',
-      '      \'X-API-Key: \' . $API_KEY,',
-      '      \'Content-Type: application/json\',',
-      '    ],',
-      '  ]);',
-      '  $body = curl_exec($ch);',
-      '  curl_close($ch);',
-      '  return json_decode($body, true)[\'job_id\'];',
-      '}',
-      '',
-      '// 2a. Polling fallback — poll until completed or failed',
-      'function pollJob(string $jobId): array {',
-      '  global $BASE_URL, $API_KEY;',
-      '  $ch = curl_init("$BASE_URL/api/v1/jobs/$jobId");',
-      '  curl_setopt_array($ch, [',
-      '    CURLOPT_RETURNTRANSFER => true,',
-      '    CURLOPT_HTTPHEADER     => [\'X-API-Key: \' . $API_KEY],',
-      '  ]);',
-      '  do {',
-      '    sleep(1);',
-      '    $job = json_decode(curl_exec($ch), true);',
-      '  } while (in_array($job[\'status\'], [\'queued\', \'processing\'], true));',
-      '  curl_close($ch);',
-      '  return $job;',
-      '}',
-      '',
-      '// 2b. Webhook receiver — place this in your web server',
-      '// POST /webhook/claudegate',
-      'function handleWebhook(): void {',
-      '  $payload = json_decode(file_get_contents(\'php://input\'), true);',
-      '  $jobId  = $payload[\'job_id\']  ?? \'\';',
-      '  $status = $payload[\'status\']  ?? \'\';',
-      '  $result = $payload[\'result\']  ?? \'\';',
-      '  // Process $result — store in DB, notify user, etc.',
-      '  error_log("Job $jobId finished with status $status");',
-      '  http_response_code(200);',
-      '}',
-      '',
-      '$jobId = createJob(\'Summarise the theory of relativity in 3 sentences.\');',
-      'echo "Job created: $jobId\\n";',
-      '',
-      '// Use pollJob() if you are not running a webhook receiver:',
-      '$result = pollJob($jobId);',
-      'echo $result[\'result\'] . "\\n";'
-    ].join('\n')
+    label: 'Polling + Webhook', lang: 'PHP', lang_class: 'php',
+    code: "<?php\n// Create a job with an optional callback_url for webhook delivery.\n// Falls back to polling if no webhook server is available.\n\n$BASE_URL   = 'https://example.com';\n$API_KEY    = 'your-api-key';\n$WEBHOOK    = 'https://your-app.example.com/webhook/claudegate';\n\n// 1. Submit the job\nfunction createJob(string $prompt): string {\n  global $BASE_URL, $API_KEY, $WEBHOOK;\n  $payload = json_encode([\n    'prompt'       => $prompt,\n    'model'        => 'haiku',\n    'callback_url' => $WEBHOOK,   // optional \u2014 remove if not using webhooks\n  ]);\n  $ch = curl_init(\"$BASE_URL/api/v1/jobs\");\n  curl_setopt_array($ch, [\n    CURLOPT_RETURNTRANSFER => true,\n    CURLOPT_POST           => true,\n    CURLOPT_POSTFIELDS     => $payload,\n    CURLOPT_HTTPHEADER     => [\n      'X-API-Key: ' . $API_KEY,\n      'Content-Type: application/json',\n    ],\n  ]);\n  $body = curl_exec($ch);\n  curl_close($ch);\n  return json_decode($body, true)['job_id'];\n}\n\n// 2a. Polling fallback \u2014 poll until completed or failed\nfunction pollJob(string $jobId): array {\n  global $BASE_URL, $API_KEY;\n  $ch = curl_init(\"$BASE_URL/api/v1/jobs/$jobId\");\n  curl_setopt_array($ch, [\n    CURLOPT_RETURNTRANSFER => true,\n    CURLOPT_HTTPHEADER     => ['X-API-Key: ' . $API_KEY],\n  ]);\n  do {\n    sleep(1);\n    $job = json_decode(curl_exec($ch), true);\n  } while (in_array($job['status'], ['queued', 'processing'], true));\n  curl_close($ch);\n  return $job;\n}\n\n// 2b. Webhook receiver \u2014 place this in your web server\n// POST /webhook/claudegate\nfunction handleWebhook(): void {\n  $payload = json_decode(file_get_contents('php://input'), true);\n  $jobId  = $payload['job_id']  ?? '';\n  $status = $payload['status']  ?? '';\n  $result = $payload['result']  ?? '';\n  // Process $result \u2014 store in DB, notify user, etc.\n  error_log(\"Job $jobId finished with status $status\");\n  http_response_code(200);\n}\n\n$jobId = createJob('Summarise the theory of relativity in 3 sentences.');\necho \"Job created: $jobId\\n\";\n\n// Use pollJob() if you are not running a webhook receiver:\n$result = pollJob($jobId);\necho $result['result'] . \"\\n\";"
   },
   {
-    label: 'Webhook',
-    lang: 'Node.js / Express',
-    lang_class: 'javascript',
-    code: [
-      '// Express server that submits a job and receives the result via webhook.',
-      '// Run: npm install express && node server.js',
-      '',
-      'import express from \'express\';',
-      '',
-      'const BASE_URL    = \'https://example.com\';',
-      'const API_KEY     = \'your-api-key\';',
-      'const SERVER_URL  = \'https://your-app.example.com\'; // publicly reachable',
-      'const WEBHOOK_PATH = \'/webhook/claudegate\';',
-      '',
-      'const app = express();',
-      'app.use(express.json());',
-      '',
-      '// 1. Webhook receiver — ClaudeGate POSTs here when the job finishes',
-      'app.post(WEBHOOK_PATH, (req, res) => {',
-      '  const { job_id, status, result, error } = req.body;',
-      '  console.log(`[webhook] job ${job_id} → ${status}`);',
-      '  if (status === \'completed\') {',
-      '    console.log(\'Result:\', result);',
-      '    // TODO: save to database, emit to a WebSocket, send an email, …',
-      '  } else if (status === \'failed\') {',
-      '    console.error(\'Job failed:\', error);',
-      '  }',
-      '  res.sendStatus(200); // always ACK quickly',
-      '});',
-      '',
-      '// 2. Submit a job pointing back to this server',
-      'async function submitJob(prompt) {',
-      '  const res = await fetch(`${BASE_URL}/api/v1/jobs`, {',
-      '    method: \'POST\',',
-      '    headers: {',
-      '      \'X-API-Key\': API_KEY,',
-      '      \'Content-Type\': \'application/json\'',
-      '    },',
-      '    body: JSON.stringify({',
-      '      prompt,',
-      '      model: \'sonnet\',',
-      '      callback_url: SERVER_URL + WEBHOOK_PATH',
-      '    })',
-      '  });',
-      '  if (!res.ok) throw new Error(\'Failed: \' + res.status);',
-      '  const { job_id } = await res.json();',
-      '  console.log(\'Job queued:\', job_id);',
-      '}',
-      '',
-      'app.listen(3000, async () => {',
-      '  console.log(\'Listening on :3000\');',
-      '  await submitJob(\'Write a haiku about distributed systems.\');',
-      '});'
-    ].join('\n')
+    label: 'Webhook', lang: 'Node.js / Express', lang_class: 'javascript',
+    code: "// Express server that submits a job and receives the result via webhook.\n// Run: npm install express && node server.js\n\nimport express from 'express';\n\nconst BASE_URL    = 'https://example.com';\nconst API_KEY     = 'your-api-key';\nconst SERVER_URL  = 'https://your-app.example.com'; // publicly reachable\nconst WEBHOOK_PATH = '/webhook/claudegate';\n\nconst app = express();\napp.use(express.json());\n\n// 1. Webhook receiver \u2014 ClaudeGate POSTs here when the job finishes\napp.post(WEBHOOK_PATH, (req, res) => {\n  const { job_id, status, result, error } = req.body;\n  console.log(`[webhook] job ${job_id} \u2192 ${status}`);\n  if (status === 'completed') {\n    console.log('Result:', result);\n    // TODO: save to database, emit to a WebSocket, send an email, \u2026\n  } else if (status === 'failed') {\n    console.error('Job failed:', error);\n  }\n  res.sendStatus(200); // always ACK quickly\n});\n\n// 2. Submit a job pointing back to this server\nasync function submitJob(prompt) {\n  const res = await fetch(`${BASE_URL}/api/v1/jobs`, {\n    method: 'POST',\n    headers: {\n      'X-API-Key': API_KEY,\n      'Content-Type': 'application/json'\n    },\n    body: JSON.stringify({\n      prompt,\n      model: 'sonnet',\n      callback_url: SERVER_URL + WEBHOOK_PATH\n    })\n  });\n  if (!res.ok) throw new Error('Failed: ' + res.status);\n  const { job_id } = await res.json();\n  console.log('Job queued:', job_id);\n}\n\napp.listen(3000, async () => {\n  console.log('Listening on :3000');\n  await submitJob('Write a haiku about distributed systems.');\n});"
   }
 ];
-
-function escapeHTML(str) {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
 
 function buildExamples() {
   var container = document.getElementById('integrationExamples');
   examples.forEach(function(ex, i) {
-    var idx = 'ex-' + i;
     var div = document.createElement('div');
-    div.className = 'endpoint';
-
+    div.className = 'collapse-item';
     div.innerHTML =
-      '<div class="endpoint-head" data-exidx="' + i + '">' +
-        '<span class="method method-example">' + ex.lang + '</span>' +
-        '<span class="path" style="font-family:inherit;font-size:13px">' + ex.label + '</span>' +
-        '<span class="chevron">&#9654;</span>' +
+      '<div class="collapse-head">' +
+        '<span class="method-badge method-lang">' + ex.lang + '</span>' +
+        '<span class="collapse-path non-mono">' + ex.label + '</span>' +
+        '<span class="collapse-chevron">&#9654;</span>' +
       '</div>' +
-      '<div class="endpoint-body" id="' + idx + '-body">' +
-        '<div>' +
-          '<div class="code-block" style="position:relative">' +
-            '<button class="btn-copy" id="' + idx + '-copy">Copy</button>' +
-            '<pre><code class="language-' + ex.lang_class + '">' + escapeHTML(ex.code) + '</code></pre>' +
-          '</div>' +
-        '</div>' +
+      '<div class="collapse-body">' +
+        '<div class="code-block"><button class="btn-copy">Copy</button><pre><code class="language-' + ex.lang_class + '">' + escapeHTML(ex.code) + '</code></pre></div>' +
       '</div>';
 
-    div.querySelector('.endpoint-head').addEventListener('click', function() {
-      var body = div.querySelector('.endpoint-body');
-      var chevron = div.querySelector('.chevron');
+    div.querySelector('.collapse-head').addEventListener('click', function() {
+      var body = div.querySelector('.collapse-body');
+      var chev = div.querySelector('.collapse-chevron');
       var open = body.classList.toggle('open');
-      chevron.style.transform = open ? 'rotate(90deg)' : '';
+      chev.style.transform = open ? 'rotate(90deg)' : '';
     });
 
-    div.querySelector('#' + idx + '-copy').addEventListener('click', function(e) {
+    div.querySelector('.btn-copy').addEventListener('click', function(e) {
       e.stopPropagation();
       navigator.clipboard.writeText(ex.code).then(function() {
         e.target.textContent = 'Copied!';
@@ -1437,10 +1703,14 @@ function buildExamples() {
   });
 }
 
+// ── Build all ──
+buildGuide();
+buildDocs();
 buildExamples();
+if (apiKey) loadHistory();
 Prism.highlightAll();
 
-// ── Splitter ──────────────────────────────────────────────────────────────────
+// ── Splitter ──
 (function() {
   var splitter = document.getElementById('splitter');
   var panelLeft = document.querySelector('.panel-left');
@@ -1456,13 +1726,10 @@ Prism.highlightAll();
     localStorage.setItem('cg_split_pos', pct);
   }
 
-  // Restore saved position
   var saved = parseFloat(localStorage.getItem('cg_split_pos'));
-  if (saved && saved >= MIN_PCT && saved <= 100 - MIN_PCT) {
-    panelLeft.style.width = saved + '%';
-  }
+  if (saved && saved >= MIN_PCT && saved <= 100 - MIN_PCT) panelLeft.style.width = saved + '%';
 
-  function startDrag(clientX) {
+  function startDrag() {
     dragging = true;
     splitter.classList.add('active');
     document.body.style.userSelect = 'none';
@@ -1472,8 +1739,7 @@ Prism.highlightAll();
   function onMove(clientX) {
     if (!dragging) return;
     var rect = main.getBoundingClientRect();
-    var pct = ((clientX - rect.left) / rect.width) * 100;
-    applyWidth(pct);
+    applyWidth(((clientX - rect.left) / rect.width) * 100);
   }
 
   function stopDrag() {
@@ -1484,23 +1750,11 @@ Prism.highlightAll();
     document.body.style.cursor = '';
   }
 
-  splitter.addEventListener('mousedown', function(e) {
-    e.preventDefault();
-    startDrag(e.clientX);
-  });
-
+  splitter.addEventListener('mousedown', function(e) { e.preventDefault(); startDrag(); });
   document.addEventListener('mousemove', function(e) { onMove(e.clientX); });
   document.addEventListener('mouseup', stopDrag);
-
-  splitter.addEventListener('touchstart', function(e) {
-    e.preventDefault();
-    startDrag(e.touches[0].clientX);
-  }, { passive: false });
-
-  document.addEventListener('touchmove', function(e) {
-    if (dragging) { e.preventDefault(); onMove(e.touches[0].clientX); }
-  }, { passive: false });
-
+  splitter.addEventListener('touchstart', function(e) { e.preventDefault(); startDrag(); }, { passive: false });
+  document.addEventListener('touchmove', function(e) { if (dragging) { e.preventDefault(); onMove(e.touches[0].clientX); } }, { passive: false });
   document.addEventListener('touchend', stopDrag);
 }());
 
