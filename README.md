@@ -152,6 +152,8 @@ docker run -d \
 
 ## Systemd
 
+The included `claudegate.service` assumes the binary lives at `/opt/claudegate/`. Adjust `ExecStart`, `WorkingDirectory`, and `EnvironmentFile` paths if your setup differs.
+
 ```bash
 # Copy binary
 make build
