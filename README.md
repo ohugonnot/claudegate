@@ -2,6 +2,141 @@
 
 HTTP gateway that wraps Claude Code CLI as a REST API with an async job queue.
 
+---
+
+## Prerequisites
+
+Before you start, make sure you have:
+
+- A Linux server (Debian/Ubuntu recommended)
+- An Anthropic account with Claude Code CLI access
+- Basic terminal knowledge
+- Node.js 18+ installed (`node --version` to check)
+
+---
+
+## Installation
+
+### Step 1: Install Claude Code CLI
+
+```bash
+# Install Claude Code globally
+npm install -g @anthropic-ai/claude-code
+
+# Authenticate — follow the prompts to log in with your Anthropic account
+claude
+```
+
+> Note the path to the `claude` binary — you will need it in Step 4.
+> ```bash
+> which claude
+> # Example output: /usr/local/bin/claude
+> ```
+
+### Step 2: Install Go (via mise)
+
+```bash
+# Install mise (polyglot tool version manager)
+curl https://mise.run | sh
+
+# Add mise to your shell
+echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc
+source ~/.bashrc
+
+# Install the latest Go toolchain
+mise use -g go@latest
+```
+
+### Step 3: Clone and build ClaudeGate
+
+```bash
+git clone https://github.com/ohugonnot/claudegate.git
+cd claudegate
+
+# Compile the static binary to bin/claudegate
+make build
+```
+
+### Step 4: Configure
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` with your values:
+
+```bash
+# Required: one or more comma-separated API keys for authenticating requests
+# Generate a strong key with: openssl rand -base64 36
+CLAUDEGATE_API_KEYS=<your-generated-key>
+
+# Required: absolute path to the Claude CLI binary (from `which claude`)
+CLAUDEGATE_CLAUDE_PATH=/usr/local/bin/claude
+
+# Optional: bind to localhost only (recommended for production with a reverse proxy)
+CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8080
+
+# Optional: default model when none is specified in a job request
+CLAUDEGATE_DEFAULT_MODEL=haiku
+
+# Optional: number of parallel Claude CLI workers
+CLAUDEGATE_CONCURRENCY=1
+
+# Optional: SQLite database file path (for job persistence)
+CLAUDEGATE_DB_PATH=claudegate.db
+
+# Optional: in-memory queue capacity
+CLAUDEGATE_QUEUE_SIZE=1000
+```
+
+> **All variables are read from the environment — ClaudeGate has no built-in `.env` loader.**
+> The `.env` file is picked up by systemd via `EnvironmentFile` (see the Systemd section), or you can `export` them manually before running.
+
+### Step 5: Run
+
+```bash
+# Run directly (for testing)
+./bin/claudegate
+
+# Or use make
+make run
+```
+
+> For production, run ClaudeGate as a systemd service. See the **Systemd** section below.
+
+### Step 6: Test it
+
+```bash
+# Health check — no authentication required
+curl http://localhost:8080/api/v1/health
+
+# Submit a job
+curl -X POST http://localhost:8080/api/v1/jobs \
+  -H "X-API-Key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "Say hello!", "model": "haiku"}'
+
+# Open the web playground in your browser
+# http://localhost:8080/
+```
+
+---
+
+## Security Note
+
+ClaudeGate runs Claude CLI with `--dangerously-skip-permissions`, which means Claude can execute any action the system user has permissions for. **Never run it as root.**
+
+```bash
+# Create a dedicated system user with no login shell
+sudo useradd -r -s /usr/sbin/nologin claudegate
+
+# Run the service as this user (see the Systemd section)
+```
+
+> The default security system prompt instructs Claude to refuse filesystem, shell, and network operations. This is a soft guardrail — see the **Security** section for full details.
+
+---
+
 ## Features
 
 - Async job queue with configurable concurrency
@@ -15,22 +150,7 @@ HTTP gateway that wraps Claude Code CLI as a REST API with an async job queue.
 - Optional system prompt and metadata per job
 - Single static binary (pure Go, no CGO) with embedded frontend
 
-## Quick Start
-
-```bash
-# Install toolchain (requires mise)
-make setup
-
-# Build
-make build
-
-# Configure
-cp .env.example .env
-# Edit .env and set CLAUDEGATE_API_KEYS
-
-# Run
-make run
-```
+---
 
 ## Configuration
 
@@ -45,6 +165,8 @@ All configuration is via environment variables.
 | `CLAUDEGATE_CONCURRENCY` | `1` | Number of parallel workers |
 | `CLAUDEGATE_DB_PATH` | `claudegate.db` | SQLite database file path |
 | `CLAUDEGATE_QUEUE_SIZE` | `1000` | In-memory queue capacity |
+
+---
 
 ## API Reference
 
@@ -133,7 +255,6 @@ curl -N http://localhost:8080/api/v1/jobs/a1b2c3d4-.../sse \
 Events emitted:
 - `status` — job moved to `processing`
 - `chunk` — incremental text from the model (payload: `{"text": "..."}`)
-
 - `result` — final status, result, and error (connection closes after this)
 
 ### DELETE /api/v1/jobs/{id}
@@ -158,6 +279,8 @@ Response:
 {"status": "ok"}
 ```
 
+---
+
 ## Docker
 
 ```bash
@@ -174,27 +297,31 @@ docker run -d \
   claudegate
 ```
 
+---
+
 ## Systemd
 
 The included `claudegate.service` assumes the binary lives at `/opt/claudegate/`. Adjust `ExecStart`, `WorkingDirectory`, and `EnvironmentFile` paths if your setup differs.
 
 ```bash
-# Copy binary
+# Build and copy the binary
 make build
 cp bin/claudegate /opt/claudegate/bin/claudegate
 
-# Copy and configure environment
+# Copy and configure the environment file
 cp .env.example /opt/claudegate/.env
-# Edit /opt/claudegate/.env
+# Edit /opt/claudegate/.env with your values
 
 # Install and start the service
 cp claudegate.service /etc/systemd/system/claudegate.service
 systemctl daemon-reload
 systemctl enable --now claudegate
 
-# Check logs
+# Follow live logs
 journalctl -u claudegate -f
 ```
+
+---
 
 ## Security
 
@@ -225,13 +352,61 @@ Set `CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT=true` to remove the security system pr
 - Consider network-level restrictions (firewall, VPN)
 - Run the service user with the most restrictive permissions possible
 
-## Production
+---
 
-In production, bind to localhost and put a reverse proxy (Nginx, Caddy, etc.) in front:
+## Reverse Proxy (Production)
+
+In production, bind ClaudeGate to localhost and use a reverse proxy for external access with TLS.
 
 ```bash
 CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8080
 ```
+
+> **Important:** SSE streaming requires the proxy to flush packets immediately. Without this, SSE connections will hang until the job finishes.
+
+### Apache
+
+```apache
+# Enable required modules: a]proxy proxy_http headers
+# sudo a2enmod proxy proxy_http headers
+
+# In your VirtualHost block:
+ProxyPreserveHost On
+
+# ClaudeGate — flushpackets=on is critical for SSE streaming
+ProxyPass        /claudegate/ http://127.0.0.1:8080/ flushpackets=on
+ProxyPassReverse /claudegate/ http://127.0.0.1:8080/
+```
+
+### Nginx
+
+```nginx
+location /claudegate/ {
+    proxy_pass http://127.0.0.1:8080/;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # SSE streaming — disable buffering
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 300s;
+}
+```
+
+### Caddy
+
+```
+example.com {
+    handle_path /claudegate/* {
+        reverse_proxy localhost:8080
+    }
+}
+```
+Caddy handles SSE streaming and TLS certificates automatically.
+
+---
 
 ## Architecture & Code Documentation
 
@@ -454,6 +629,8 @@ A shell script that accepts the same arguments as the real Claude CLI and emits 
 | **`stream-json` parsing** | Native output format of the Claude CLI. Parsing it directly avoids wrapping the CLI in a PTY or scraping human-readable output. |
 | **Job ID only in channel** | Enqueueing the ID rather than the full `Job` struct keeps the channel payload tiny and ensures workers always read the latest state from the DB. |
 | **Constant-time key comparison** | Timing attacks on string equality are a real class of vulnerability for authentication secrets. `subtle.ConstantTimeCompare` costs nothing and closes the vector. |
+
+---
 
 ## License
 

@@ -108,6 +108,8 @@ select option{background:var(--surface)}
 .json-num{color:#79c0ff}
 .json-bool{color:#ff7b72}
 .json-null{color:#ff7b72}
+.method-example{background:rgba(139,92,246,.2);color:#a78bfa}
+.method-step{background:rgba(139,149,158,.2);color:var(--muted);font-weight:700}
 
 /* Try it */
 .tryit-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
@@ -149,6 +151,15 @@ select option{background:var(--surface)}
   .splitter{display:none}
 }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css">
+<style>
+code[class*="language-"],pre[class*="language-"]{background:var(--bg)!important;font-size:12px;margin:0;padding:0}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup-templating.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -237,10 +248,16 @@ select option{background:var(--surface)}
     <!-- Draggable splitter -->
     <div class="splitter" id="splitter"></div>
 
-    <!-- Right panel: API Docs -->
+    <!-- Right panel: Getting Started + API Docs + Integration Examples -->
     <div class="panel-right">
-      <div class="card-title" style="margin-bottom:12px">API Documentation</div>
+      <div class="card-title" style="margin-bottom:4px">Getting Started</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">From zero to running in 5 minutes.</div>
+      <div id="gettingStarted"></div>
+      <div class="card-title" style="margin-top:24px;margin-bottom:12px">API Documentation</div>
       <div id="apiDocs"></div>
+      <div class="card-title" style="margin-top:24px;margin-bottom:12px">Integration Examples</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px">Ready-to-use code snippets for integrating ClaudeGate into your application.</div>
+      <div id="integrationExamples"></div>
     </div>
 
   </div>
@@ -534,6 +551,132 @@ async function deleteJob(id) {
     console.error('Failed to delete job:', e);
   }
   loadHistory();
+}
+
+// ── Getting Started Guide ─────────────────────────────────────────────────────
+var steps = [
+  {
+    label: '1',
+    title: 'Install Claude Code CLI',
+    code: [
+      '# Requires Node.js 18+',
+      'npm install -g @anthropic-ai/claude-code',
+      '',
+      '# Authenticate with your Anthropic account',
+      'claude'
+    ].join('\n')
+  },
+  {
+    label: '2',
+    title: 'Install Go',
+    code: [
+      '# Install mise (version manager)',
+      'curl https://mise.run | sh',
+      'echo \'eval "$(~/.local/bin/mise activate bash)"\' >> ~/.bashrc',
+      'source ~/.bashrc',
+      '',
+      '# Install Go',
+      'mise use -g go@latest'
+    ].join('\n')
+  },
+  {
+    label: '3',
+    title: 'Build',
+    code: [
+      'git clone https://github.com/ohugonnot/claudegate.git',
+      'cd claudegate',
+      'make build'
+    ].join('\n')
+  },
+  {
+    label: '4',
+    title: 'Configure',
+    code: [
+      'cp .env.example .env',
+      '# Edit .env — set at minimum:',
+      '#   CLAUDEGATE_API_KEYS=<your-secret-key>',
+      '#   CLAUDEGATE_CLAUDE_PATH=$(which claude)'
+    ].join('\n')
+  },
+  {
+    label: '5',
+    title: 'Run & Test',
+    code: [
+      './bin/claudegate',
+      '',
+      '# Test: curl http://localhost:8080/api/v1/health',
+      '# Then open http://localhost:8080/ in your browser'
+    ].join('\n')
+  },
+  {
+    label: '6',
+    title: 'Reverse Proxy (optional)',
+    code: [
+      '# Bind to localhost in .env:',
+      '#   CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8080',
+      '',
+      '# ── Apache ──────────────────────────',
+      '# sudo a2enmod proxy proxy_http headers',
+      '# Add to your VirtualHost:',
+      'ProxyPass        /claudegate/ http://127.0.0.1:8080/ flushpackets=on',
+      'ProxyPassReverse /claudegate/ http://127.0.0.1:8080/',
+      '',
+      '# ── Nginx ───────────────────────────',
+      '# Add to your server block:',
+      'location /claudegate/ {',
+      '    proxy_pass http://127.0.0.1:8080/;',
+      '    proxy_buffering off;  # critical for SSE',
+      '    proxy_cache off;',
+      '    proxy_read_timeout 300s;',
+      '}',
+      '',
+      '# ── Caddy ───────────────────────────',
+      '# handle_path /claudegate/* {',
+      '#     reverse_proxy localhost:8080',
+      '# }'
+    ].join('\n')
+  }
+];
+
+function buildGuide() {
+  var container = document.getElementById('gettingStarted');
+  steps.forEach(function(step, i) {
+    var idx = 'step-' + i;
+    var div = document.createElement('div');
+    div.className = 'endpoint';
+
+    div.innerHTML =
+      '<div class="endpoint-head" data-stepidx="' + i + '">' +
+        '<span class="method method-step">' + step.label + '</span>' +
+        '<span class="path" style="font-family:inherit;font-size:13px">' + step.title + '</span>' +
+        '<span class="chevron">&#9654;</span>' +
+      '</div>' +
+      '<div class="endpoint-body" id="' + idx + '-body">' +
+        '<div>' +
+          '<div class="code-block" style="position:relative">' +
+            '<button class="btn-copy" id="' + idx + '-copy">Copy</button>' +
+            '<pre><code class="language-bash">' + escapeHTML(step.code) + '</code></pre>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    div.querySelector('.endpoint-head').addEventListener('click', function() {
+      var body = div.querySelector('.endpoint-body');
+      var chevron = div.querySelector('.chevron');
+      var open = body.classList.toggle('open');
+      chevron.style.transform = open ? 'rotate(90deg)' : '';
+    });
+
+    div.querySelector('#' + idx + '-copy').addEventListener('click', function(e) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(step.code).then(function() {
+        e.target.textContent = 'Copied!';
+        setTimeout(function() { e.target.textContent = 'Copy'; }, 1500);
+      }).catch(function() {});
+    });
+
+    container.appendChild(div);
+  });
 }
 
 // ── API Documentation ─────────────────────────────────────────────────────────
@@ -1000,8 +1143,250 @@ function buildDocs() {
   });
 }
 
+buildGuide();
 buildDocs();
 if (apiKey) loadHistory();
+
+// ── Integration Examples ──────────────────────────────────────────────────────
+var examples = [
+  {
+    label: 'SSE Streaming',
+    lang: 'JavaScript',
+    lang_class: 'javascript',
+    code: [
+      '// Submit a job then stream the response in real-time',
+      '// Works in both browser and Node.js (Node 18+)',
+      '',
+      'const BASE_URL = \'https://example.com\';',
+      'const API_KEY  = \'your-api-key\';',
+      '',
+      'async function streamJob(prompt) {',
+      '  // 1. Create the job',
+      '  const createRes = await fetch(`${BASE_URL}/api/v1/jobs`, {',
+      '    method: \'POST\',',
+      '    headers: {',
+      '      \'X-API-Key\': API_KEY,',
+      '      \'Content-Type\': \'application/json\'',
+      '    },',
+      '    body: JSON.stringify({ prompt, model: \'haiku\' })',
+      '  });',
+      '  if (!createRes.ok) throw new Error(\'Job creation failed: \' + createRes.status);',
+      '  const { job_id } = await createRes.json();',
+      '',
+      '  // 2. Open SSE stream — EventSource cannot send custom headers,',
+      '  //    so we use fetch + ReadableStream instead.',
+      '  const sseRes = await fetch(`${BASE_URL}/api/v1/jobs/${job_id}/sse`, {',
+      '    headers: { \'X-API-Key\': API_KEY }',
+      '  });',
+      '  if (!sseRes.ok) throw new Error(\'SSE connect failed: \' + sseRes.status);',
+      '',
+      '  const reader  = sseRes.body.getReader();',
+      '  const decoder = new TextDecoder();',
+      '  let buf = \'\';',
+      '',
+      '  while (true) {',
+      '    const { done, value } = await reader.read();',
+      '    if (done) break;',
+      '    buf += decoder.decode(value, { stream: true });',
+      '    const messages = buf.split(\'\\n\\n\');',
+      '    buf = messages.pop(); // keep incomplete tail',
+      '',
+      '    for (const msg of messages) {',
+      '      const eventLine = msg.split(\'\\n\').find(l => l.startsWith(\'event: \'));',
+      '      const dataLine  = msg.split(\'\\n\').find(l => l.startsWith(\'data: \'));',
+      '      if (!dataLine) continue;',
+      '      const event = eventLine ? eventLine.slice(7).trim() : \'\';',
+      '      const data  = JSON.parse(dataLine.slice(6));',
+      '',
+      '      if (event === \'chunk\')  process.stdout.write(data.text || \'\');',
+      '      if (event === \'result\') { console.log(\'\\nDone:\', data.status); break; }',
+      '    }',
+      '  }',
+      '}',
+      '',
+      'streamJob(\'Explain what a mutex is.\').catch(console.error);'
+    ].join('\n')
+  },
+  {
+    label: 'Polling + Webhook',
+    lang: 'PHP',
+    lang_class: 'php',
+    code: [
+      '<?php',
+      '// Create a job with an optional callback_url for webhook delivery.',
+      '// Falls back to polling if no webhook server is available.',
+      '',
+      '$BASE_URL   = \'https://example.com\';',
+      '$API_KEY    = \'your-api-key\';',
+      '$WEBHOOK    = \'https://your-app.example.com/webhook/claudegate\';',
+      '',
+      '// 1. Submit the job',
+      'function createJob(string $prompt): string {',
+      '  global $BASE_URL, $API_KEY, $WEBHOOK;',
+      '  $payload = json_encode([',
+      '    \'prompt\'       => $prompt,',
+      '    \'model\'        => \'haiku\',',
+      '    \'callback_url\' => $WEBHOOK,   // optional — remove if not using webhooks',
+      '  ]);',
+      '  $ch = curl_init("$BASE_URL/api/v1/jobs");',
+      '  curl_setopt_array($ch, [',
+      '    CURLOPT_RETURNTRANSFER => true,',
+      '    CURLOPT_POST           => true,',
+      '    CURLOPT_POSTFIELDS     => $payload,',
+      '    CURLOPT_HTTPHEADER     => [',
+      '      \'X-API-Key: \' . $API_KEY,',
+      '      \'Content-Type: application/json\',',
+      '    ],',
+      '  ]);',
+      '  $body = curl_exec($ch);',
+      '  curl_close($ch);',
+      '  return json_decode($body, true)[\'job_id\'];',
+      '}',
+      '',
+      '// 2a. Polling fallback — poll until completed or failed',
+      'function pollJob(string $jobId): array {',
+      '  global $BASE_URL, $API_KEY;',
+      '  $ch = curl_init("$BASE_URL/api/v1/jobs/$jobId");',
+      '  curl_setopt_array($ch, [',
+      '    CURLOPT_RETURNTRANSFER => true,',
+      '    CURLOPT_HTTPHEADER     => [\'X-API-Key: \' . $API_KEY],',
+      '  ]);',
+      '  do {',
+      '    sleep(1);',
+      '    $job = json_decode(curl_exec($ch), true);',
+      '  } while (in_array($job[\'status\'], [\'queued\', \'processing\'], true));',
+      '  curl_close($ch);',
+      '  return $job;',
+      '}',
+      '',
+      '// 2b. Webhook receiver — place this in your web server',
+      '// POST /webhook/claudegate',
+      'function handleWebhook(): void {',
+      '  $payload = json_decode(file_get_contents(\'php://input\'), true);',
+      '  $jobId  = $payload[\'job_id\']  ?? \'\';',
+      '  $status = $payload[\'status\']  ?? \'\';',
+      '  $result = $payload[\'result\']  ?? \'\';',
+      '  // Process $result — store in DB, notify user, etc.',
+      '  error_log("Job $jobId finished with status $status");',
+      '  http_response_code(200);',
+      '}',
+      '',
+      '$jobId = createJob(\'Summarise the theory of relativity in 3 sentences.\');',
+      'echo "Job created: $jobId\\n";',
+      '',
+      '// Use pollJob() if you are not running a webhook receiver:',
+      '$result = pollJob($jobId);',
+      'echo $result[\'result\'] . "\\n";'
+    ].join('\n')
+  },
+  {
+    label: 'Webhook',
+    lang: 'Node.js / Express',
+    lang_class: 'javascript',
+    code: [
+      '// Express server that submits a job and receives the result via webhook.',
+      '// Run: npm install express && node server.js',
+      '',
+      'import express from \'express\';',
+      '',
+      'const BASE_URL    = \'https://example.com\';',
+      'const API_KEY     = \'your-api-key\';',
+      'const SERVER_URL  = \'https://your-app.example.com\'; // publicly reachable',
+      'const WEBHOOK_PATH = \'/webhook/claudegate\';',
+      '',
+      'const app = express();',
+      'app.use(express.json());',
+      '',
+      '// 1. Webhook receiver — ClaudeGate POSTs here when the job finishes',
+      'app.post(WEBHOOK_PATH, (req, res) => {',
+      '  const { job_id, status, result, error } = req.body;',
+      '  console.log(`[webhook] job ${job_id} → ${status}`);',
+      '  if (status === \'completed\') {',
+      '    console.log(\'Result:\', result);',
+      '    // TODO: save to database, emit to a WebSocket, send an email, …',
+      '  } else if (status === \'failed\') {',
+      '    console.error(\'Job failed:\', error);',
+      '  }',
+      '  res.sendStatus(200); // always ACK quickly',
+      '});',
+      '',
+      '// 2. Submit a job pointing back to this server',
+      'async function submitJob(prompt) {',
+      '  const res = await fetch(`${BASE_URL}/api/v1/jobs`, {',
+      '    method: \'POST\',',
+      '    headers: {',
+      '      \'X-API-Key\': API_KEY,',
+      '      \'Content-Type\': \'application/json\'',
+      '    },',
+      '    body: JSON.stringify({',
+      '      prompt,',
+      '      model: \'sonnet\',',
+      '      callback_url: SERVER_URL + WEBHOOK_PATH',
+      '    })',
+      '  });',
+      '  if (!res.ok) throw new Error(\'Failed: \' + res.status);',
+      '  const { job_id } = await res.json();',
+      '  console.log(\'Job queued:\', job_id);',
+      '}',
+      '',
+      'app.listen(3000, async () => {',
+      '  console.log(\'Listening on :3000\');',
+      '  await submitJob(\'Write a haiku about distributed systems.\');',
+      '});'
+    ].join('\n')
+  }
+];
+
+function escapeHTML(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function buildExamples() {
+  var container = document.getElementById('integrationExamples');
+  examples.forEach(function(ex, i) {
+    var idx = 'ex-' + i;
+    var div = document.createElement('div');
+    div.className = 'endpoint';
+
+    div.innerHTML =
+      '<div class="endpoint-head" data-exidx="' + i + '">' +
+        '<span class="method method-example">' + ex.lang + '</span>' +
+        '<span class="path" style="font-family:inherit;font-size:13px">' + ex.label + '</span>' +
+        '<span class="chevron">&#9654;</span>' +
+      '</div>' +
+      '<div class="endpoint-body" id="' + idx + '-body">' +
+        '<div>' +
+          '<div class="code-block" style="position:relative">' +
+            '<button class="btn-copy" id="' + idx + '-copy">Copy</button>' +
+            '<pre><code class="language-' + ex.lang_class + '">' + escapeHTML(ex.code) + '</code></pre>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    div.querySelector('.endpoint-head').addEventListener('click', function() {
+      var body = div.querySelector('.endpoint-body');
+      var chevron = div.querySelector('.chevron');
+      var open = body.classList.toggle('open');
+      chevron.style.transform = open ? 'rotate(90deg)' : '';
+    });
+
+    div.querySelector('#' + idx + '-copy').addEventListener('click', function(e) {
+      e.stopPropagation();
+      navigator.clipboard.writeText(ex.code).then(function() {
+        e.target.textContent = 'Copied!';
+        setTimeout(function() { e.target.textContent = 'Copy'; }, 1500);
+      }).catch(function() {});
+    });
+
+    container.appendChild(div);
+  });
+}
+
+buildExamples();
+Prism.highlightAll();
 
 // ── Splitter ──────────────────────────────────────────────────────────────────
 (function() {
