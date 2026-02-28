@@ -4,6 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
+User=claudegate
+Group=claudegate
 ExecStart=/opt/claudegate/bin/claudegate
 WorkingDirectory=/opt/claudegate
 EnvironmentFile=/opt/claudegate/.env

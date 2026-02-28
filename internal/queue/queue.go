@@ -13,13 +13,13 @@ import (
 	"github.com/claudegate/claudegate/internal/worker"
 )
 
-// SSEEvent représente un événement Server-Sent Events.
+// SSEEvent represents a Server-Sent Events event.
 type SSEEvent struct {
 	Event string // "status", "chunk", "result"
 	Data  string // JSON string
 }
 
-// Queue gère la file d'attente des jobs et les workers.
+// Queue manages the job queue and workers.
 type Queue struct {
 	jobs  chan string
 	store job.Store
@@ -28,7 +28,7 @@ type Queue struct {
 	cfg   *config.Config
 }
 
-// New crée une nouvelle Queue.
+// New creates a new Queue.
 func New(cfg *config.Config, store job.Store) *Queue {
 	return &Queue{
 		jobs:  make(chan string, cfg.QueueSize),
@@ -38,7 +38,7 @@ func New(cfg *config.Config, store job.Store) *Queue {
 	}
 }
 
-// Enqueue ajoute un job ID dans la file. Retourne une erreur si la file est pleine.
+// Enqueue adds a job ID to the queue. Returns an error if the queue is full.
 func (q *Queue) Enqueue(jobID string) error {
 	select {
 	case q.jobs <- jobID:
@@ -48,14 +48,14 @@ func (q *Queue) Enqueue(jobID string) error {
 	}
 }
 
-// Start lance N workers (cfg.Concurrency) en goroutines.
+// Start launches N workers (cfg.Concurrency) as goroutines.
 func (q *Queue) Start(ctx context.Context) {
 	for range q.cfg.Concurrency {
 		go q.runWorker(ctx)
 	}
 }
 
-// Subscribe crée un canal SSE bufferisé pour un job et le retourne.
+// Subscribe creates a buffered SSE channel for a job and returns it.
 func (q *Queue) Subscribe(jobID string) chan SSEEvent {
 	ch := make(chan SSEEvent, 64)
 	q.mu.Lock()
@@ -64,7 +64,7 @@ func (q *Queue) Subscribe(jobID string) chan SSEEvent {
 	return ch
 }
 
-// Unsubscribe retire un canal SSE de la map.
+// Unsubscribe removes an SSE channel from the map.
 func (q *Queue) Unsubscribe(jobID string, ch chan SSEEvent) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -81,7 +81,7 @@ func (q *Queue) Unsubscribe(jobID string, ch chan SSEEvent) {
 	}
 }
 
-// Recovery réinitialise les jobs "processing" et les ré-enqueue.
+// Recovery resets "processing" jobs and re-enqueues them.
 func (q *Queue) Recovery(ctx context.Context) error {
 	ids, err := q.store.ResetProcessing(ctx)
 	if err != nil {
@@ -95,7 +95,7 @@ func (q *Queue) Recovery(ctx context.Context) error {
 	return nil
 }
 
-// runWorker est la boucle d'un worker : prend des jobs et les traite.
+// runWorker is a worker loop: dequeues jobs and processes them.
 func (q *Queue) runWorker(ctx context.Context) {
 	for {
 		select {
@@ -170,7 +170,7 @@ func (q *Queue) finalizeJob(ctx context.Context, jobID, result, errMsg, callback
 	}
 }
 
-// notify envoie un événement à tous les abonnés d'un job sans bloquer.
+// notify sends an event to all subscribers of a job without blocking.
 func (q *Queue) notify(jobID string, event SSEEvent) {
 	q.mu.RLock()
 	chans := q.subs[jobID]
@@ -184,7 +184,7 @@ func (q *Queue) notify(jobID string, event SSEEvent) {
 	}
 }
 
-// notifyAndClose envoie l'événement final et ferme tous les canaux du job.
+// notifyAndClose sends the final event and closes all channels for the job.
 func (q *Queue) notifyAndClose(jobID string, event SSEEvent) {
 	q.mu.Lock()
 	chans := q.subs[jobID]
