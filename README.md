@@ -414,13 +414,31 @@ Caddy handles SSE streaming and TLS certificates automatically.
 ### Overview
 
 ```
-POST /api/v1/jobs → API Handler → SQLite Store → Queue (chan) → Worker (claude CLI) → SQLite
-                                                                                      ↓
-                                                            SSE stream ← notify ← Queue
-                                                            Webhook POST → callback_url
+                                    ┌─────────────┐
+POST /api/v1/jobs ──► API Handler ──► SQLite Store │
+                                    └──────┬──────┘
+                                           │
+                                    ┌──────▼──────┐
+                                    │  Queue (chan)│
+                                    └──────┬──────┘
+                                           │
+                                    ┌──────▼──────┐
+                                    │   Worker    │
+                                    │ (claude CLI)│
+                                    └──┬───────┬──┘
+                                       │       │
+                              ┌────────▼┐  ┌───▼────────┐
+                              │  SQLite  │  │  SSE stream │
+                              │ (result) │  │  (chunks)   │
+                              └────────┬┘  └────────────┘
+                                       │
+                              ┌────────▼────────┐
+                              │ Webhook callback │
+                              │   (optional)     │
+                              └─────────────────┘
 ```
 
-A job is created synchronously in SQLite and enqueued in memory. Workers pick it up, call the Claude CLI, stream chunks back via SSE, and write the final result to SQLite. Webhooks fire-and-forget after completion.
+A job is created in SQLite and enqueued in memory. Workers pick it up, call the Claude CLI, stream chunks back via SSE, and write the final result to SQLite. Webhooks fire-and-forget after completion.
 
 ### Project Structure
 
