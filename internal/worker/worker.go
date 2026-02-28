@@ -18,6 +18,7 @@ type ChunkCallback func(text string)
 func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, onChunk ChunkCallback) (string, error) {
 	args := []string{
 		"--print",
+		"--verbose",
 		"--model", model,
 		"--output-format", "stream-json",
 		"--dangerously-skip-permissions",
