@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -197,8 +198,35 @@ func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
 }
 
 // Health handles GET /api/v1/health and responds 200.
+// It also reports Claude OAuth token validity from ~/.claude/.credentials.json.
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	resp := map[string]string{"status": "ok", "claude_auth": "unknown"}
+
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		data, err := os.ReadFile(homeDir + "/.claude/.credentials.json")
+		if err == nil {
+			var creds struct {
+				ClaudeAiOauth struct {
+					ExpiresAt int64 `json:"expiresAt"`
+				} `json:"claudeAiOauth"`
+			}
+			if json.Unmarshal(data, &creds) == nil && creds.ClaudeAiOauth.ExpiresAt > 0 {
+				expiresAt := time.UnixMilli(creds.ClaudeAiOauth.ExpiresAt).UTC()
+				remaining := time.Until(expiresAt)
+				if remaining > 0 {
+					resp["claude_auth"] = "valid"
+				} else {
+					resp["claude_auth"] = "expired"
+					remaining = -remaining
+				}
+				resp["token_expires_at"] = expiresAt.Format(time.RFC3339)
+				resp["token_expires_in"] = remaining.Truncate(time.Second).String()
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

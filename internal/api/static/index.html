@@ -251,6 +251,17 @@ select option { background: var(--bg-raised); }
 .key-status.valid { background: var(--green); box-shadow: 0 0 8px rgba(126,198,153,0.4); }
 .key-status.invalid { background: var(--red); box-shadow: 0 0 8px rgba(224,108,117,0.4); }
 
+.token-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.token-badge.ok { background: var(--green-dim); color: var(--green); }
+.token-badge.warn { background: var(--yellow-dim); color: var(--yellow); }
+.token-badge.expired { background: var(--red-dim); color: var(--red); }
+
 .btn-save {
   background: var(--accent);
   color: var(--text-inverse);
@@ -896,6 +907,7 @@ code[class*="language-"], pre[class*="language-"] {
       </div>
       <div class="key-status" id="keyStatus" title="Key status"></div>
       <button class="btn-save" id="btnSave">Save</button>
+      <span class="token-badge" id="tokenBadge"></span>
     </div>
   </div>
 
@@ -1036,7 +1048,35 @@ function setKeyStatus(valid) {
   keyStatus.title = valid === true ? 'Key valid' : valid === false ? 'Key invalid or server unreachable' : 'Not validated';
 }
 
+function checkTokenStatus() {
+  var badge = document.getElementById('tokenBadge');
+  fetch(apiUrl('api/v1/health'))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.claude_auth === 'valid' && data.token_expires_in) {
+        var expiresIn = data.token_expires_in;
+        var hMatch = expiresIn.match(/(\d+)h/);
+        var totalHours = hMatch ? parseInt(hMatch[1], 10) : 0;
+        var cls = totalHours >= 2 ? 'ok' : 'warn';
+        badge.textContent = expiresIn;
+        badge.className = 'token-badge ' + cls;
+      } else if (data.claude_auth === 'expired') {
+        badge.textContent = 'Token expired';
+        badge.className = 'token-badge expired';
+      } else {
+        badge.textContent = '';
+        badge.className = 'token-badge';
+      }
+    })
+    .catch(function() {
+      badge.textContent = '';
+      badge.className = 'token-badge';
+    });
+}
+
 if (apiKey) validateKey();
+checkTokenStatus();
+setInterval(checkTokenStatus, 60000);
 
 // ── Helpers ──
 function authHeaders(extra) {
