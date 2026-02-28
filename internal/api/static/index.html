@@ -471,6 +471,12 @@ select option { background: var(--bg-raised); }
   font-size: 11px;
   color: var(--text-tertiary);
 }
+.response-timer {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-left: auto;
+}
 .response-box {
   background: var(--bg-deep);
   border: 1px solid var(--border-subtle);
@@ -866,7 +872,7 @@ code[class*="language-"], pre[class*="language-"] {
   .logo-sub { display: none; }
 }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" data-manual></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup-templating.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-php.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
@@ -941,6 +947,7 @@ code[class*="language-"], pre[class*="language-"] {
               <span class="response-label">Response</span>
               <span id="statusBadge"></span>
               <span class="response-jobid" id="jobIdDisplay"></span>
+              <span class="response-timer" id="elapsedTimer"></span>
             </div>
             <div class="response-box" id="responseBox"><span class="response-empty">Response will appear here...</span></div>
           </div>
@@ -1053,13 +1060,10 @@ function escapeHTML(str) {
 }
 
 function highlightJSON(str) {
-  return str
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/("(?:[^"\\]|\\.)*")\s*:/g, '<span class="json-key">$1</span>:')
-    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="json-str">$1</span>')
-    .replace(/:\s*(-?\d+(?:\.\d+)?)/g, ': <span class="json-num">$1</span>')
-    .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
-    .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>');
+  if (typeof Prism !== 'undefined' && Prism.languages.json) {
+    return Prism.highlight(str, Prism.languages.json, 'json');
+  }
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ── System prompt toggle ──
@@ -1080,7 +1084,32 @@ var btnSend = document.getElementById('btnSend');
 var responseBox = document.getElementById('responseBox');
 var statusBadgeEl = document.getElementById('statusBadge');
 var jobIdDisplay = document.getElementById('jobIdDisplay');
+var elapsedTimer = document.getElementById('elapsedTimer');
+var timerInterval = null;
+var timerStart = null;
 var activeSSE = null;
+
+function startTimer() {
+  timerStart = Date.now();
+  elapsedTimer.textContent = '0.0s';
+  timerInterval = setInterval(function() {
+    var elapsed = ((Date.now() - timerStart) / 1000);
+    if (elapsed < 60) {
+      elapsedTimer.textContent = elapsed.toFixed(1) + 's';
+    } else {
+      var mins = Math.floor(elapsed / 60);
+      var secs = (elapsed % 60).toFixed(0);
+      elapsedTimer.textContent = mins + 'm ' + secs + 's';
+    }
+  }, 100);
+}
+
+function stopTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
 
 btnSend.addEventListener('click', sendJob);
 
@@ -1095,6 +1124,8 @@ function sendJob() {
   responseBox.innerHTML = '';
   statusBadgeEl.innerHTML = badgeHTML('queued');
   jobIdDisplay.textContent = '';
+  stopTimer();
+  startTimer();
 
   var body = { prompt: prompt, model: modelSelect.value };
   var sp = systemPrompt.value.trim();
@@ -1141,6 +1172,7 @@ function openSSE(jobId) {
           pump();
         }).catch(function(e) {
           if (e.name !== 'AbortError') showError('Stream error: ' + e.message);
+          stopTimer();
           btnSend.disabled = false;
           loadHistory();
         });
@@ -1149,6 +1181,7 @@ function openSSE(jobId) {
     })
     .catch(function(e) {
       if (e.name !== 'AbortError') showError('SSE error: ' + e.message);
+      stopTimer();
       btnSend.disabled = false;
     });
 }
@@ -1190,6 +1223,7 @@ function parseSSEChunk(raw) {
       responseBox.textContent = 'Error: ' + data.error;
     }
     responseBox.scrollTop = responseBox.scrollHeight;
+    stopTimer();
     btnSend.disabled = false;
     if (activeSSE) { activeSSE.abort(); activeSSE = null; }
     loadHistory();
@@ -1197,11 +1231,13 @@ function parseSSEChunk(raw) {
 }
 
 function showError(msg) {
+  stopTimer();
   statusBadgeEl.innerHTML = badgeHTML('failed');
   responseBox.textContent = msg;
 }
 
 function showJobResult(job) {
+  elapsedTimer.textContent = '';
   jobIdDisplay.textContent = '#' + job.job_id.slice(0, 8);
   statusBadgeEl.innerHTML = badgeHTML(job.status);
   if (job.result) {
@@ -1333,7 +1369,7 @@ var endpoints = [
 '<code>response_format</code> — text (default) or json<br>' +
 '<code>metadata</code> — arbitrary JSON, returned as-is',
     curl: "curl -X POST https://example.com/api/v1/jobs \\\n  -H \"X-API-Key: your-key\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"prompt\": \"Explain what a mutex is.\", \"model\": \"haiku\", \"system_prompt\": \"Be concise.\", \"response_format\": \"json\", \"callback_url\": \"https://example.com/webhook\", \"metadata\": {\"user_id\": 42}}'",
-    response: '{\n  "job_id": "a1b2c3d4-e5f6-...",\n  "prompt": "Explain what a mutex is.",\n  "model": "haiku",\n  "status": "queued",\n  "response_format": "json",\n  "metadata": {"user_id": 42},\n  "created_at": "2025-01-01T00:00:00Z"\n}',
+    response: '{\n  "job_id": "a1b2c3d4-e5f6-...",\n  "prompt": "Explain what a mutex is.",\n  "model": "haiku",\n  "status": "queued",\n  "system_prompt": "Be concise.",\n  "callback_url": "https://example.com/webhook",\n  "response_format": "json",\n  "metadata": {"user_id": 42},\n  "created_at": "2025-01-01T00:00:00Z"\n}',
     tryit: { type: 'post-job' }
   },
   {
@@ -1343,16 +1379,17 @@ var endpoints = [
 '<code>limit</code> — number of jobs to return, default 20 (max 100)<br>' +
 '<code>offset</code> — number of jobs to skip, default 0',
     curl: "curl \"https://example.com/api/v1/jobs?limit=10&offset=0\" \\\n  -H \"X-API-Key: your-key\"",
-    response: '{\n  "jobs": [ { "job_id": "...", "status": "completed", ... } ],\n  "total": 42,\n  "limit": 10,\n  "offset": 0\n}',
+    response: '{\n  "jobs": [\n    {\n      "job_id": "a1b2c3d4-...",\n      "prompt": "Explain what a mutex is.",\n      "system_prompt": "Be concise.",\n      "model": "haiku",\n      "status": "completed",\n      "result": "A mutex is...",\n      "callback_url": "https://example.com/webhook",\n      "response_format": "json",\n      "metadata": {"user_id": 42},\n      "created_at": "2025-01-01T00:00:00Z",\n      "started_at": "2025-01-01T00:00:00.1Z",\n      "completed_at": "2025-01-01T00:00:02Z"\n    }\n  ],\n  "total": 42,\n  "limit": 10,\n  "offset": 0\n}',
     tryit: { type: 'list-jobs' }
   },
   {
     method: 'GET', path: '/api/v1/jobs/{id}',
     desc: 'Poll a job\'s status and result. Returns 200 OK or 404 if not found.<br><br>' +
 '<strong>Path parameters:</strong><br>' +
-'<code>id</code> <em>(required)</em> — job UUID returned by the POST endpoint',
+'<code>id</code> <em>(required)</em> — job UUID returned by the POST endpoint' +
+'<br><br><strong>Response:</strong> Full Job object. Optional fields (<code>system_prompt</code>, <code>callback_url</code>, <code>response_format</code>, <code>metadata</code>, <code>result</code>, <code>error</code>, <code>started_at</code>, <code>completed_at</code>) are omitted when empty.',
     curl: "curl \"https://example.com/api/v1/jobs/a1b2c3d4-...\" \\\n  -H \"X-API-Key: your-key\"",
-    response: '{\n  "job_id": "a1b2c3d4-...",\n  "model": "haiku",\n  "status": "completed",\n  "result": "A mutex ensures exclusive access to a shared resource.",\n  "created_at": "2025-01-01T00:00:00Z",\n  "started_at": "2025-01-01T00:00:00.1Z",\n  "completed_at": "2025-01-01T00:00:02Z"\n}',
+    response: '{\n  "job_id": "a1b2c3d4-...",\n  "prompt": "Explain what a mutex is.",\n  "system_prompt": "Be concise.",\n  "model": "haiku",\n  "status": "completed",\n  "result": "A mutex is...",\n  "callback_url": "https://example.com/webhook",\n  "response_format": "json",\n  "metadata": {"user_id": 42},\n  "created_at": "2025-01-01T00:00:00Z",\n  "started_at": "2025-01-01T00:00:00.1Z",\n  "completed_at": "2025-01-01T00:00:02Z"\n}',
     tryit: { type: 'get-job' }
   },
   {
@@ -1362,7 +1399,7 @@ var endpoints = [
 '<code>id</code> <em>(required)</em> — job UUID to stream<br><br>' +
 '<strong>Events:</strong> status, chunk, result',
     curl: "curl -N \"https://example.com/api/v1/jobs/a1b2c3d4-.../sse\" \\\n  -H \"X-API-Key: your-key\"",
-    response: 'event: status\ndata: {"job_id":"...","status":"processing"}\n\nevent: chunk\ndata: {"text":"A mutex "}\n\nevent: result\ndata: {"job_id":"...","status":"completed","result":"A mutex..."}',
+    response: 'event: status\ndata: {"job_id":"...","status":"processing"}\n\nevent: chunk\ndata: {"text":"A mutex "}\n\nevent: result\ndata: {"job_id":"...","status":"completed","result":"A mutex is...","created_at":"...","started_at":"...","completed_at":"..."}',
     tryit: { type: 'sse-job' }
   },
   {

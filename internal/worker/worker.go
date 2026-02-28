@@ -67,7 +67,13 @@ func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, on
 		if ctx.Err() != nil {
 			return "", ctx.Err()
 		}
-		return "", fmt.Errorf("claude exited: %w — stderr: %s", err, stderr.String())
+		// The CLI often reports errors in stdout (JSON stream) rather than stderr.
+		// Prefer finalResult when available as it contains the actual error message.
+		detail := stderr.String()
+		if detail == "" && finalResult != "" {
+			detail = finalResult
+		}
+		return "", fmt.Errorf("claude exited: %w — %s", err, detail)
 	}
 
 	return finalResult, nil

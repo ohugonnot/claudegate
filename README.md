@@ -204,6 +204,24 @@ Response:
 }
 ```
 
+**Response fields (Job object):**
+
+| Field | Type | Always present | Description |
+|---|---|---|---|
+| `job_id` | string | yes | Unique job identifier (UUID) |
+| `prompt` | string | yes | The submitted prompt |
+| `model` | string | yes | Model used: `haiku`, `sonnet`, or `opus` |
+| `status` | string | yes | `queued` → `processing` → `completed` / `failed` / `cancelled` |
+| `created_at` | string | yes | ISO 8601 creation timestamp |
+| `system_prompt` | string | no | Custom system instruction (omitted if not set) |
+| `callback_url` | string | no | Webhook URL (omitted if not set) |
+| `response_format` | string | no | `text` or `json` (omitted if not set) |
+| `metadata` | object | no | Arbitrary JSON passed at creation (omitted if not set) |
+| `result` | string | no | Claude's response (present when `completed`) |
+| `error` | string | no | Error message (present when `failed`) |
+| `started_at` | string | no | ISO 8601 timestamp (present once processing begins) |
+| `completed_at` | string | no | ISO 8601 timestamp (present when job reaches terminal state) |
+
 ### GET /api/v1/jobs/{id}
 
 Poll a job's status and result.
@@ -224,14 +242,20 @@ Response:
 {
   "job_id": "a1b2c3d4-...",
   "prompt": "Explain what a mutex is in one sentence.",
+  "system_prompt": "Be concise.",
   "model": "haiku",
   "status": "completed",
-  "result": "A mutex is a synchronization primitive that ensures only one goroutine accesses a shared resource at a time.",
+  "result": "A mutex is a synchronization primitive...",
+  "callback_url": "https://example.com/webhook",
+  "response_format": "json",
+  "metadata": {"user_id": 42},
   "created_at": "2025-06-15T00:00:00Z",
   "started_at": "2025-06-15T00:00:00.1Z",
   "completed_at": "2025-06-15T00:00:02Z"
 }
 ```
+
+> Fields marked "no" in the table above are omitted from the response when empty or not applicable.
 
 Job statuses: `queued`, `processing`, `completed`, `failed`, `cancelled`.
 
@@ -260,6 +284,8 @@ Response:
   "offset": 0
 }
 ```
+
+> Same Job object as above. Each job in the array follows the same schema.
 
 ### GET /api/v1/jobs/{id}/sse
 
