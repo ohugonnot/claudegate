@@ -157,6 +157,9 @@ select option{background:var(--surface)}
                 <option value="opus">claude-opus</option>
               </select>
             </div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap">
+              <input type="checkbox" id="jsonMode"> JSON mode
+            </label>
           </div>
 
           <div class="field">
@@ -323,6 +326,7 @@ async function sendJob() {
   const body = { prompt, model: modelSelect.value };
   const sp = systemPrompt.value.trim();
   if (sp) body.system_prompt = sp;
+  if (document.getElementById('jsonMode').checked) body.response_format = 'json';
 
   let jobId;
   try {
@@ -412,7 +416,15 @@ function parseSSEChunk(raw) {
     delete responseBox.dataset.streaming;
     statusBadgeEl.innerHTML = statusBadgeHTML(data.status || 'completed');
     if (data.result) {
-      responseBox.textContent = data.result;
+      if (document.getElementById('jsonMode').checked) {
+        try {
+          responseBox.textContent = JSON.stringify(JSON.parse(data.result), null, 2);
+        } catch {
+          responseBox.textContent = data.result;
+        }
+      } else {
+        responseBox.textContent = data.result;
+      }
     } else if (data.error) {
       responseBox.textContent = 'Error: ' + data.error;
     }
@@ -502,7 +514,7 @@ const endpoints = [
     curl: `curl -X POST https://example.com/api/v1/jobs \\
   -H "X-API-Key: your-key" \\
   -H "Content-Type: application/json" \\
-  -d '{"prompt": "Explain what a mutex is.", "model": "haiku", "system_prompt": "Be concise."}'`,
+  -d '{"prompt": "Explain what a mutex is.", "model": "haiku", "system_prompt": "Be concise.", "response_format": "json"}'`,
     response: `{
   "job_id": "a1b2c3d4-e5f6-...",
   "prompt": "Explain what a mutex is.",

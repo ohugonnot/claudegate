@@ -22,27 +22,29 @@ var validModels = map[string]bool{
 }
 
 type Job struct {
-	ID           string          `json:"job_id"`
-	Prompt       string          `json:"prompt"`
-	SystemPrompt string          `json:"system_prompt,omitempty"`
-	Model        string          `json:"model"`
-	Status       Status          `json:"status"`
-	Result       string          `json:"result,omitempty"`
-	Error        string          `json:"error,omitempty"`
-	CallbackURL  string          `json:"callback_url,omitempty"`
-	Metadata     json.RawMessage `json:"metadata,omitempty"`
-	CreatedAt    time.Time       `json:"created_at"`
-	StartedAt    *time.Time      `json:"started_at,omitempty"`
-	CompletedAt  *time.Time      `json:"completed_at,omitempty"`
+	ID             string          `json:"job_id"`
+	Prompt         string          `json:"prompt"`
+	SystemPrompt   string          `json:"system_prompt,omitempty"`
+	Model          string          `json:"model"`
+	Status         Status          `json:"status"`
+	Result         string          `json:"result,omitempty"`
+	Error          string          `json:"error,omitempty"`
+	CallbackURL    string          `json:"callback_url,omitempty"`
+	Metadata       json.RawMessage `json:"metadata,omitempty"`
+	ResponseFormat string          `json:"response_format,omitempty"`
+	CreatedAt      time.Time       `json:"created_at"`
+	StartedAt      *time.Time      `json:"started_at,omitempty"`
+	CompletedAt    *time.Time      `json:"completed_at,omitempty"`
 }
 
 // CreateRequest is the payload used to submit a new job.
 type CreateRequest struct {
-	Prompt       string          `json:"prompt"`
-	SystemPrompt string          `json:"system_prompt,omitempty"`
-	Model        string          `json:"model,omitempty"`
-	CallbackURL  string          `json:"callback_url,omitempty"`
-	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	Prompt         string          `json:"prompt"`
+	SystemPrompt   string          `json:"system_prompt,omitempty"`
+	Model          string          `json:"model,omitempty"`
+	CallbackURL    string          `json:"callback_url,omitempty"`
+	Metadata       json.RawMessage `json:"metadata,omitempty"`
+	ResponseFormat string          `json:"response_format,omitempty"`
 }
 
 func (r *CreateRequest) Validate() error {
@@ -51,6 +53,9 @@ func (r *CreateRequest) Validate() error {
 	}
 	if r.Model != "" && !validModels[r.Model] {
 		return errors.New("model must be one of: haiku, sonnet, opus")
+	}
+	if r.ResponseFormat != "" && r.ResponseFormat != "text" && r.ResponseFormat != "json" {
+		return errors.New("response_format must be 'text' or 'json'")
 	}
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/claudegate/claudegate/internal/config"
@@ -121,6 +122,11 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 		q.finalizeJob(ctx, jobID, "", fmt.Sprintf("failed to load job: %v", err), "")
 		return
 	}
+	if j == nil {
+		log.Printf("worker: job %s not found (deleted?)", jobID)
+		q.finalizeJob(ctx, jobID, "", "job not found", "")
+		return
+	}
 
 	onChunk := func(text string) {
 		data, _ := json.Marshal(map[string]string{"text": text})
@@ -128,11 +134,19 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 	}
 
 	systemPrompt := q.cfg.SecurityPrompt
+	if j.ResponseFormat == "json" {
+		systemPrompt = systemPrompt + "\n\nCRITICAL: Your response must be RAW JSON only. Do NOT wrap it in ```json code fences. Do NOT add any text before or after the JSON. Do NOT use markdown formatting. Start directly with { or [ and end with } or ]. The raw output must be directly parseable by JSON.parse(). Be concise and fast."
+	}
 	if j.SystemPrompt != "" {
 		systemPrompt = systemPrompt + "\n\n" + j.SystemPrompt
 	}
 
 	result, runErr := worker.Run(ctx, q.cfg.ClaudePath, j.Model, j.Prompt, systemPrompt, onChunk)
+
+	// Strip markdown code fences if JSON mode (LLMs sometimes ignore instructions)
+	if j.ResponseFormat == "json" && runErr == nil {
+		result = stripCodeFences(result)
+	}
 
 	errMsg := ""
 	if runErr != nil {
@@ -168,6 +182,23 @@ func (q *Queue) finalizeJob(ctx context.Context, jobID, result, errMsg, callback
 		})
 		webhook.Send(callbackURL, payload)
 	}
+}
+
+// stripCodeFences removes markdown code fences that LLMs sometimes add despite instructions.
+func stripCodeFences(s string) string {
+	s = strings.TrimSpace(s)
+	if strings.HasPrefix(s, "```") {
+		// Remove opening fence (```json, ```, etc.)
+		if idx := strings.Index(s, "\n"); idx != -1 {
+			s = s[idx+1:]
+		}
+		// Remove closing fence
+		if strings.HasSuffix(s, "```") {
+			s = s[:len(s)-3]
+		}
+		s = strings.TrimSpace(s)
+	}
+	return s
 }
 
 // notify sends an event to all subscribers of a job without blocking.

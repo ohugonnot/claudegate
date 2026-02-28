@@ -4,14 +4,50 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
-// Send envoie le payload JSON vers callbackURL de façon asynchrone.
-// 3 tentatives max avec backoff exponentiel (1s, 2s, 4s). Timeout 30s par requête.
+// Send dispatches the JSON payload to callbackURL asynchronously.
+// 3 retries max with exponential backoff (1s, 2s, 4s). 30s timeout per request.
 func Send(callbackURL string, payload []byte) {
+	if err := validateURL(callbackURL); err != nil {
+		log.Printf("webhook: rejected callback URL %s: %v", callbackURL, err)
+		return
+	}
 	go send(callbackURL, payload)
+}
+
+// validateURL blocks non-HTTPS schemes and private/internal IP ranges.
+func validateURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+
+	if u.Scheme != "https" && u.Scheme != "http" {
+		return fmt.Errorf("unsupported scheme: %s", u.Scheme)
+	}
+
+	host := u.Hostname()
+	ips, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("DNS lookup failed: %w", err)
+	}
+
+	for _, ipStr := range ips {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() || ip.IsUnspecified() {
+			return fmt.Errorf("private/internal IP blocked: %s", ipStr)
+		}
+	}
+
+	return nil
 }
 
 func send(callbackURL string, payload []byte) {

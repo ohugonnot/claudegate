@@ -38,31 +38,37 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 func (s *SQLiteStore) migrate() error {
 	_, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS jobs (
-			id            TEXT PRIMARY KEY,
-			prompt        TEXT NOT NULL,
-			system_prompt TEXT NOT NULL DEFAULT '',
-			model         TEXT NOT NULL,
-			status        TEXT NOT NULL DEFAULT 'queued',
-			result        TEXT NOT NULL DEFAULT '',
-			error         TEXT NOT NULL DEFAULT '',
-			callback_url  TEXT NOT NULL DEFAULT '',
-			metadata      TEXT,
-			created_at    DATETIME NOT NULL,
-			started_at    DATETIME,
-			completed_at  DATETIME
+			id              TEXT PRIMARY KEY,
+			prompt          TEXT NOT NULL,
+			system_prompt   TEXT NOT NULL DEFAULT '',
+			model           TEXT NOT NULL,
+			status          TEXT NOT NULL DEFAULT 'queued',
+			result          TEXT NOT NULL DEFAULT '',
+			error           TEXT NOT NULL DEFAULT '',
+			callback_url    TEXT NOT NULL DEFAULT '',
+			metadata        TEXT,
+			response_format TEXT NOT NULL DEFAULT '',
+			created_at      DATETIME NOT NULL,
+			started_at      DATETIME,
+			completed_at    DATETIME
 		);
 		CREATE INDEX IF NOT EXISTS idx_jobs_status     ON jobs(status);
 		CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Add response_format column to existing databases that predate this migration.
+	_, _ = s.db.Exec(`ALTER TABLE jobs ADD COLUMN response_format TEXT NOT NULL DEFAULT ''`)
+	return nil
 }
 
 func (s *SQLiteStore) Create(ctx context.Context, j *Job) error {
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO jobs
-			(id, prompt, system_prompt, model, status, result, error, callback_url, metadata, created_at)
+			(id, prompt, system_prompt, model, status, result, error, callback_url, metadata, response_format, created_at)
 		VALUES
-			(?, ?, ?, ?, ?, '', '', ?, ?, ?)
+			(?, ?, ?, ?, ?, '', '', ?, ?, ?, ?)
 	`,
 		j.ID,
 		j.Prompt,
@@ -71,6 +77,7 @@ func (s *SQLiteStore) Create(ctx context.Context, j *Job) error {
 		StatusQueued,
 		j.CallbackURL,
 		nullableJSON(j.Metadata),
+		j.ResponseFormat,
 		j.CreatedAt.UTC(),
 	)
 	if err != nil {
@@ -82,7 +89,7 @@ func (s *SQLiteStore) Create(ctx context.Context, j *Job) error {
 func (s *SQLiteStore) Get(ctx context.Context, id string) (*Job, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, prompt, system_prompt, model, status, result, error,
-		       callback_url, metadata, created_at, started_at, completed_at
+		       callback_url, metadata, response_format, created_at, started_at, completed_at
 		FROM jobs WHERE id = ?
 	`, id)
 
@@ -93,7 +100,7 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Job, error) {
 	err := row.Scan(
 		&j.ID, &j.Prompt, &j.SystemPrompt, &j.Model, &j.Status,
 		&j.Result, &j.Error, &j.CallbackURL, &metadata,
-		&j.CreatedAt, &startedAt, &completedAt,
+		&j.ResponseFormat, &j.CreatedAt, &startedAt, &completedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -211,7 +218,7 @@ func (s *SQLiteStore) List(ctx context.Context, limit, offset int) ([]*Job, int,
 
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, prompt, system_prompt, model, status, result, error,
-		       callback_url, metadata, created_at, started_at, completed_at
+		       callback_url, metadata, response_format, created_at, started_at, completed_at
 		FROM jobs
 		ORDER BY created_at DESC
 		LIMIT ? OFFSET ?
@@ -230,7 +237,7 @@ func (s *SQLiteStore) List(ctx context.Context, limit, offset int) ([]*Job, int,
 		if err := rows.Scan(
 			&j.ID, &j.Prompt, &j.SystemPrompt, &j.Model, &j.Status,
 			&j.Result, &j.Error, &j.CallbackURL, &metadata,
-			&j.CreatedAt, &startedAt, &completedAt,
+			&j.ResponseFormat, &j.CreatedAt, &startedAt, &completedAt,
 		); err != nil {
 			return nil, 0, fmt.Errorf("scan job: %w", err)
 		}

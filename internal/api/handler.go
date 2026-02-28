@@ -47,6 +47,7 @@ func (h *Handler) ServeFrontend(w http.ResponseWriter, r *http.Request) {
 
 // CreateJob handles POST /api/v1/jobs and responds 202 with the created job.
 func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB max
 	var req job.CreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -64,14 +65,15 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now().UTC()
 	j := &job.Job{
-		ID:           uuid.New().String(),
-		Prompt:       req.Prompt,
-		Model:        req.Model,
-		CallbackURL:  req.CallbackURL,
-		SystemPrompt: req.SystemPrompt,
-		Metadata:     req.Metadata,
-		Status:       job.StatusQueued,
-		CreatedAt:    now,
+		ID:             uuid.New().String(),
+		Prompt:         req.Prompt,
+		Model:          req.Model,
+		CallbackURL:    req.CallbackURL,
+		SystemPrompt:   req.SystemPrompt,
+		Metadata:       req.Metadata,
+		ResponseFormat: req.ResponseFormat,
+		Status:         job.StatusQueued,
+		CreatedAt:      now,
 	}
 
 	if err := h.store.Create(r.Context(), j); err != nil {
