@@ -87,6 +87,18 @@ CLAUDEGATE_DB_PATH=claudegate.db
 
 # Optional: in-memory queue capacity
 CLAUDEGATE_QUEUE_SIZE=1000
+
+# Optional: per-job execution timeout in minutes (0 = no timeout)
+CLAUDEGATE_JOB_TIMEOUT_MINUTES=0
+
+# Optional: comma-separated CORS origins (* = allow all, empty = disabled)
+CLAUDEGATE_CORS_ORIGINS=
+
+# Optional: auto-delete terminal jobs older than N hours (0 = disabled)
+CLAUDEGATE_JOB_TTL_HOURS=0
+
+# Optional: cleanup interval in minutes (only applies when TTL > 0)
+CLAUDEGATE_CLEANUP_INTERVAL_MINUTES=60
 ```
 
 > **All variables are read from the environment — ClaudeGate has no built-in `.env` loader.**
@@ -141,6 +153,10 @@ sudo useradd -r -s /usr/sbin/nologin claudegate
 
 - Async job queue with configurable concurrency
 - Three result delivery modes: polling, SSE (Server-Sent Events), and webhook callback
+- Job cancellation (cancel queued or processing jobs via API)
+- Per-job timeout with configurable duration
+- CORS support with configurable allowed origins
+- Automatic cleanup of old terminal jobs (TTL-based)
 - Built-in web playground with job history and API documentation (served at `/`)
 - JSON response mode (`response_format: "json"`) with automatic code fence stripping
 - Multi-model support: haiku, sonnet, opus
@@ -165,6 +181,10 @@ All configuration is via environment variables.
 | `CLAUDEGATE_CONCURRENCY` | `1` | Number of parallel workers |
 | `CLAUDEGATE_DB_PATH` | `claudegate.db` | SQLite database file path |
 | `CLAUDEGATE_QUEUE_SIZE` | `1000` | In-memory queue capacity |
+| `CLAUDEGATE_JOB_TIMEOUT_MINUTES` | `0` | Per-job execution timeout in minutes (`0` = no timeout) |
+| `CLAUDEGATE_CORS_ORIGINS` | *(empty)* | Comma-separated allowed CORS origins (`*` = allow all, empty = disabled) |
+| `CLAUDEGATE_JOB_TTL_HOURS` | `0` | Auto-delete terminal jobs older than this many hours (`0` = disabled) |
+| `CLAUDEGATE_CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup runs in minutes (only when TTL is enabled) |
 
 ---
 
@@ -222,7 +242,7 @@ Response:
 }
 ```
 
-Job statuses: `queued`, `processing`, `completed`, `failed`.
+Job statuses: `queued`, `processing`, `completed`, `failed`, `cancelled`.
 
 ### GET /api/v1/jobs
 
@@ -264,6 +284,25 @@ Delete a job record. Returns `204 No Content`.
 ```bash
 curl -X DELETE http://localhost:8080/api/v1/jobs/a1b2c3d4-... \
   -H "X-API-Key: your-secret-key-here"
+```
+
+### POST /api/v1/jobs/{id}/cancel
+
+Cancel a queued or processing job. Returns `200 OK` with the cancelled status, or `409 Conflict` if the job is already in a terminal state.
+
+```bash
+curl -X POST http://localhost:8080/api/v1/jobs/a1b2c3d4-.../cancel \
+  -H "X-API-Key: your-secret-key-here"
+```
+
+Response (success):
+```json
+{"status": "cancelled"}
+```
+
+Response (already terminal):
+```json
+{"error": "job already in terminal state"}
 ```
 
 ### GET /api/v1/health
@@ -463,16 +502,17 @@ claudegate/
 3. `queue.New()` — allocates the buffered channel and subscriber map
 4. `q.Recovery()` — resets interrupted jobs before workers start (crash recovery)
 5. `q.Start(ctx)` — launches N worker goroutines
-6. `api.NewHandler()` + `RegisterRoutes()` + middleware chain — sets up HTTP
-7. `srv.ListenAndServe()` — starts accepting connections
+6. `q.StartCleanup(ctx)` — starts TTL cleanup goroutine (if configured)
+7. `api.NewHandler()` + `RegisterRoutes()` + middleware chain — sets up HTTP
+8. `srv.ListenAndServe()` — starts accepting connections
 
 **Graceful shutdown:** A goroutine waits for `SIGINT` or `SIGTERM`. On signal it calls `cancel()` to stop all workers (they drain the context), then `srv.Shutdown()` with a 10-second timeout to let in-flight HTTP requests finish.
 
 **Middleware chain order (outer to inner):**
 ```
-LoggingMiddleware → RequestIDMiddleware → AuthMiddleware → mux
+CORSMiddleware → LoggingMiddleware → RequestIDMiddleware → AuthMiddleware → mux
 ```
-Logging wraps everything so it captures the final status code. RequestID is set before auth so every request — including rejections — gets an ID. Auth sits just before the mux so all business routes are protected.
+CORS is outermost so OPTIONS preflight requests are handled before hitting auth. Logging wraps everything after CORS so it captures the final status code. RequestID is set before auth so every request — including rejections — gets an ID. Auth sits just before the mux so all business routes are protected.
 
 ---
 
@@ -545,6 +585,8 @@ Logging wraps everything so it captures the final status code. RequestID is set 
 - **SSE fan-out via `map[string][]chan SSEEvent`:** Each job can have multiple concurrent SSE subscribers (multiple browser tabs, monitoring tools). The map is protected by a `sync.RWMutex` — reads (notify) hold a read lock, writes (subscribe/unsubscribe) hold a write lock.
 - **Non-blocking notify:** `notify()` uses a `select` with a `default` branch when sending to subscriber channels. A slow or disconnected client never blocks the worker.
 - **`notifyAndClose`:** Sends the final `"result"` event then deletes the job's entry from the map and closes all channels. Closed channels cause the SSE handler's `range` to exit cleanly.
+- **Job cancellation via `cancels map`:** Each processing job registers a `context.CancelFunc` in a map protected by the existing `sync.RWMutex`. The `Cancel(id)` method looks up and calls the function, which propagates to the `exec.CommandContext` in the worker, killing the Claude CLI subprocess. Queued jobs that were cancelled while waiting in the channel are detected at the start of `processJob` via a DB status check.
+- **TTL cleanup goroutine:** `StartCleanup()` runs a `time.Ticker`-based goroutine that periodically calls `store.DeleteTerminalBefore()` to remove old completed/failed/cancelled jobs. Disabled when `JobTTLHours == 0`.
 
 ---
 
@@ -561,7 +603,7 @@ Logging wraps everything so it captures the final status code. RequestID is set 
 
 #### `internal/api/handler.go` — HTTP handlers
 
-**Role:** Implements the five REST endpoints using Go's standard `net/http` package.
+**Role:** Implements the HTTP handlers for all REST endpoints using Go's standard `net/http` package.
 
 **Technical decisions:**
 - **Go 1.22 native routing with method+path patterns:** `"POST /api/v1/jobs"` and `"GET /api/v1/jobs/{id}"` — no external router needed. `r.PathValue("id")` extracts path parameters.
@@ -580,6 +622,7 @@ Logging wraps everything so it captures the final status code. RequestID is set 
 - **`/api/v1/health` exempt from auth:** Health checks must be reachable by load balancers and monitoring systems that don't have (or shouldn't need) an API key. The exemption is checked by path string before any key lookup.
 - **`RequestIDMiddleware`:** Generates a UUID per request, sets it on the response as `X-Request-ID`, and stores it in the request context. Downstream handlers and logs can correlate entries for the same request.
 - **`statusResponseWriter`:** A thin wrapper around `http.ResponseWriter` that captures the status code written by the handler. Required because `http.ResponseWriter` does not expose the code after `WriteHeader` is called, but `LoggingMiddleware` needs it to log the final status.
+- **`CORSMiddleware`:** Handles CORS headers and preflight `OPTIONS` requests. Configured via `CLAUDEGATE_CORS_ORIGINS`. When disabled (empty), the middleware is a no-op passthrough. When enabled, it reflects the request `Origin` if it matches the allowlist (or if `*` is configured), sets `Access-Control-Allow-Headers: Content-Type, X-API-Key`, and short-circuits `OPTIONS` with `204 No Content`.
 
 ---
 
@@ -589,7 +632,7 @@ Logging wraps everything so it captures the final status code. RequestID is set 
 
 **Technical decisions:**
 - **`http.Flusher` check before starting:** Not all `http.ResponseWriter` implementations support streaming (e.g., some test recorders). The check prevents a silent hang — if flushing is not available, the handler returns an error immediately.
-- **Already-terminal shortcut:** If the job is `completed` or `failed` by the time the client connects, the handler writes a single `"result"` event and closes the connection. No subscription needed. This handles the common case where the client polls SSE after the job has already finished.
+- **Already-terminal shortcut:** If the job is `completed`, `failed`, or `cancelled` by the time the client connects, the handler writes a single `"result"` event and closes the connection. No subscription needed. This handles the common case where the client polls SSE after the job has already finished.
 - **Subscribe → send initial status → stream:** After subscribing, the handler sends the current job status so the client has an initial state even if no new events arrive immediately. Then it loops over the channel until it is closed (job finished) or the client disconnects (`r.Context().Done()`).
 - **`defer h.queue.Unsubscribe`:** Guarantees the channel is removed from the fan-out map when the handler exits, regardless of whether the client disconnected or the job completed. Prevents a channel leak.
 

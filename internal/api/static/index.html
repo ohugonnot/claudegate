@@ -64,6 +64,7 @@ select option{background:var(--surface)}
 .badge-processing{background:rgba(88,166,255,.15);color:var(--accent)}
 .badge-completed{background:rgba(63,185,80,.15);color:var(--success)}
 .badge-failed{background:rgba(248,81,73,.15);color:var(--error)}
+.badge-cancelled{background:rgba(139,149,158,.15);color:var(--muted)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .badge-processing{animation:pulse 1.5s ease-in-out infinite}
 
@@ -495,7 +496,7 @@ function showJobResult(job) {
   } else if (job.error) {
     responseBox.textContent = 'Error: ' + job.error;
   } else {
-    responseBox.textContent = job.status === 'queued' ? 'Job is queued...' : 'Processing...';
+    responseBox.textContent = job.status === 'queued' ? 'Job is queued...' : job.status === 'cancelled' ? 'Job was cancelled.' : 'Processing...';
   }
 }
 
@@ -526,12 +527,21 @@ function renderHistory(jobs) {
   jobs.forEach(job => {
     const item = document.createElement('div');
     item.className = 'job-item';
+    const isTerminal = job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
     item.innerHTML =
       `<span class="job-id">#${job.job_id.slice(0,8)}</span>` +
       `<span class="job-model">${job.model}</span>` +
       statusBadgeHTML(job.status) +
       `<span class="job-time">${timeAgo(job.created_at)}</span>` +
+      (!isTerminal ? `<button class="btn-cancel" data-id="${job.job_id}" title="Cancel job" style="background:none;color:var(--muted);padding:2px 5px;font-size:13px;flex-shrink:0;border-radius:3px;cursor:pointer;border:none">&#9632;</button>` : '') +
       `<button class="btn-delete" data-id="${job.job_id}" title="Delete job">&#128465;</button>`;
+    const cancelBtn = item.querySelector('.btn-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await cancelJob(job.job_id);
+      });
+    }
     item.querySelector('.btn-delete').addEventListener('click', async (e) => {
       e.stopPropagation();
       await deleteJob(job.job_id);
@@ -549,6 +559,18 @@ async function deleteJob(id) {
     });
   } catch (e) {
     console.error('Failed to delete job:', e);
+  }
+  loadHistory();
+}
+
+async function cancelJob(id) {
+  try {
+    await fetch(api('api/v1/jobs/' + id + '/cancel'), {
+      method: 'POST',
+      headers: authHeaders()
+    });
+  } catch (e) {
+    console.error('Failed to cancel job:', e);
   }
   loadHistory();
 }
@@ -750,6 +772,16 @@ data: {"job_id":"...","status":"completed","result":"A mutex..."}`,
     tryit: { type: 'delete-job' }
   },
   {
+    method: 'POST', path: '/api/v1/jobs/{id}/cancel',
+    desc: 'Cancel a queued or processing job. Returns 200 with cancelled status. Returns 409 if the job is already in a terminal state (completed, failed, cancelled).',
+    curl: `curl -X POST "https://example.com/api/v1/jobs/a1b2c3d4-.../cancel" \\
+  -H "X-API-Key: your-key"`,
+    response: `{
+  "status": "cancelled"
+}`,
+    tryit: { type: 'cancel-job' }
+  },
+  {
     method: 'GET', path: '/api/v1/health',
     desc: 'Health check. No authentication required.',
     curl: `curl "https://example.com/api/v1/health"`,
@@ -807,7 +839,7 @@ function buildTryitHTML(ep, i) {
           '<input type="number" id="ti-'+i+'-offset" value="0" min="0">' +
         '</div>' +
       '</div>';
-  } else if (t === 'get-job' || t === 'sse-job' || t === 'delete-job') {
+  } else if (t === 'get-job' || t === 'sse-job' || t === 'delete-job' || t === 'cancel-job') {
     fields =
       '<div class="tryit-field">' +
         '<label>job_id</label>' +
@@ -965,6 +997,26 @@ function tryitSend(ep, i) {
         return r.text().then(function(txt) {
           var body204 = r.status === 204 ? '(no content)' : (txt || '');
           showTryitResponse(i, r.status, hdr, body204.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+          btn.disabled = false;
+          if (r.ok) loadHistory();
+        });
+      }).catch(function(e) {
+        resp.classList.add('visible');
+        bodyEl.textContent = 'Network error: ' + e.message;
+        btn.disabled = false;
+      });
+
+  } else if (t === 'cancel-job') {
+    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
+    fetch(api('api/v1/jobs/' + jobId + '/cancel'), { method: 'POST', headers: authHeaders() })
+      .then(function(r) {
+        var hdr = extractHeaders(r);
+        return r.text().then(function(txt) {
+          var highlighted;
+          try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
+          catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+          showTryitResponse(i, r.status, hdr, highlighted);
           btn.disabled = false;
           if (r.ok) loadHistory();
         });
