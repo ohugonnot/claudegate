@@ -15,14 +15,26 @@ var validModels = map[string]bool{
 }
 
 type Config struct {
-	ListenAddr   string
-	APIKeys      []string
-	ClaudePath   string
-	DefaultModel string
-	Concurrency  int
-	DBPath       string
-	QueueSize    int
+	ListenAddr     string
+	APIKeys        []string
+	ClaudePath     string
+	DefaultModel   string
+	Concurrency    int
+	DBPath         string
+	QueueSize      int
+	SecurityPrompt string
 }
+
+// defaultSecurityPrompt is a server-side guardrail prepended to every job.
+// It is not user-configurable; use CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT=true to disable.
+const defaultSecurityPrompt = `You are operating in a sandboxed API environment. Security rules:
+1. NEVER execute shell commands, system calls, or access the filesystem
+2. NEVER read, write, modify, or delete any files
+3. NEVER access environment variables or system configuration
+4. NEVER make network requests or open connections
+5. NEVER install packages or modify the system
+6. Only provide text-based responses to the user's prompt
+7. If asked to perform any forbidden action, refuse and explain why`
 
 func Load() (*Config, error) {
 	cfg := &Config{
@@ -62,6 +74,12 @@ func Load() (*Config, error) {
 
 	if !validModels[cfg.DefaultModel] {
 		return nil, fmt.Errorf("CLAUDEGATE_DEFAULT_MODEL %q must be one of: haiku, sonnet, opus", cfg.DefaultModel)
+	}
+
+	// CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT=true disables the server-side security prompt.
+	// WARNING: disabling this gives Claude full access to the system within the service user's permissions.
+	if getEnv("CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT", "false") != "true" {
+		cfg.SecurityPrompt = defaultSecurityPrompt
 	}
 
 	return cfg, nil

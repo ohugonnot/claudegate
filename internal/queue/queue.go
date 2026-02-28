@@ -127,7 +127,12 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 		q.notify(jobID, SSEEvent{Event: "chunk", Data: string(data)})
 	}
 
-	result, runErr := worker.Run(ctx, q.cfg.ClaudePath, j.Model, j.Prompt, j.SystemPrompt, onChunk)
+	systemPrompt := q.cfg.SecurityPrompt
+	if j.SystemPrompt != "" {
+		systemPrompt = systemPrompt + "\n\n" + j.SystemPrompt
+	}
+
+	result, runErr := worker.Run(ctx, q.cfg.ClaudePath, j.Model, j.Prompt, systemPrompt, onChunk)
 
 	errMsg := ""
 	if runErr != nil {

@@ -172,6 +172,35 @@ systemctl enable --now claudegate
 journalctl -u claudegate -f
 ```
 
+## Security
+
+### How it works
+
+ClaudeGate uses `--dangerously-skip-permissions` to run Claude CLI without interactive confirmation prompts. This is required for API/daemon usage but means Claude can execute any action the system user has permissions for.
+
+### Built-in protections
+
+- **Security system prompt (default ON):** A server-side system prompt is prepended to every job, instructing Claude to only provide text responses and refuse filesystem, shell, or network operations. This is a soft guardrail — it relies on Claude following instructions, not a technical sandbox.
+- **API key authentication:** All endpoints (except health) require a valid `X-API-Key` header. Keys are compared using constant-time comparison to prevent timing attacks.
+- **Dedicated system user:** The service should run as a non-root user with minimal permissions. Never run as root.
+- **Localhost binding:** By default, configure `CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8080` and use a reverse proxy for external access.
+
+### Disabling the security prompt
+
+Set `CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT=true` to remove the security system prompt. This gives Claude full access to the system (within the service user's permissions). Only do this if:
+- You fully trust all API key holders
+- The service user has minimal filesystem access
+- You have network-level access controls in place
+
+### Recommendations for production
+
+- Use strong, randomly generated API keys (32+ characters)
+- Rotate API keys regularly
+- Run behind a reverse proxy with TLS
+- Monitor logs for suspicious prompts
+- Consider network-level restrictions (firewall, VPN)
+- Run the service user with the most restrictive permissions possible
+
 ## Production
 
 In production, bind to localhost and put a reverse proxy (Nginx, Caddy, etc.) in front:
