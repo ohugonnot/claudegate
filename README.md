@@ -456,7 +456,7 @@ claudegate/
 
 | Decision | Rationale |
 |---|---|
-| **No HTTP framework** | Go 1.22 stdlib routing covers method matching and path parameters. No dependency, no magic. |
+| **No HTTP framework** | Go stdlib routing (1.22+) covers method matching and path parameters. No dependency, no magic. |
 | **SQLite over Postgres/Redis** | Zero config, embedded in the binary's working directory, one file to back up. The bottleneck is the Claude CLI (seconds/job), not DB throughput. |
 | **Buffered channel over a message broker** | Same reasoning: the channel is orders of magnitude faster than any external queue. Simplicity wins. |
 | **`modernc.org/sqlite` (pure Go)** | `CGO_ENABLED=0` enables cross-compilation and scratch/Alpine containers without a C toolchain. |
