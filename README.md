@@ -2,7 +2,22 @@
 
 HTTP gateway that wraps Claude Code CLI as a REST API with an async job queue.
 
----
+## Features
+
+- Async job queue with configurable concurrency
+- Three result delivery modes: polling, SSE (Server-Sent Events), and webhook callback
+- Job cancellation (cancel queued or processing jobs via API)
+- Per-job timeout with configurable duration
+- CORS support with configurable allowed origins
+- Automatic cleanup of old terminal jobs (TTL-based)
+- Built-in web playground with job history and API documentation (served at `/`)
+- JSON response mode (`response_format: "json"`) with automatic code fence stripping
+- Multi-model support: haiku, sonnet, opus
+- SQLite-backed job persistence with crash recovery
+- API key authentication with constant-time comparison
+- SSRF protection on webhook callback URLs
+- Optional system prompt and metadata per job
+- Single static binary (pure Go, no CGO) with embedded frontend
 
 ## Prerequisites
 
@@ -12,8 +27,6 @@ Before you start, make sure you have:
 - An Anthropic account with Claude Code CLI access
 - Basic terminal knowledge
 - Node.js 18+ installed (`node --version` to check)
-
----
 
 ## Installation
 
@@ -132,8 +145,6 @@ curl -X POST http://localhost:8080/api/v1/jobs \
 # http://localhost:8080/
 ```
 
----
-
 ## Security Note
 
 ClaudeGate runs Claude CLI with `--dangerously-skip-permissions`, which means Claude can execute any action the system user has permissions for. **Never run it as root.**
@@ -146,47 +157,6 @@ sudo useradd -r -s /usr/sbin/nologin claudegate
 ```
 
 > The default security system prompt instructs Claude to refuse filesystem, shell, and network operations. This is a soft guardrail — see the **Security** section for full details.
-
----
-
-## Features
-
-- Async job queue with configurable concurrency
-- Three result delivery modes: polling, SSE (Server-Sent Events), and webhook callback
-- Job cancellation (cancel queued or processing jobs via API)
-- Per-job timeout with configurable duration
-- CORS support with configurable allowed origins
-- Automatic cleanup of old terminal jobs (TTL-based)
-- Built-in web playground with job history and API documentation (served at `/`)
-- JSON response mode (`response_format: "json"`) with automatic code fence stripping
-- Multi-model support: haiku, sonnet, opus
-- SQLite-backed job persistence with crash recovery
-- API key authentication with constant-time comparison
-- SSRF protection on webhook callback URLs
-- Optional system prompt and metadata per job
-- Single static binary (pure Go, no CGO) with embedded frontend
-
----
-
-## Configuration
-
-All configuration is via environment variables.
-
-| Variable | Default | Description |
-|---|---|---|
-| `CLAUDEGATE_LISTEN_ADDR` | `:8080` | Address and port to listen on |
-| `CLAUDEGATE_API_KEYS` | *(required)* | Comma-separated list of valid API keys |
-| `CLAUDEGATE_CLAUDE_PATH` | `/root/.local/bin/claude` | Path to the Claude CLI binary |
-| `CLAUDEGATE_DEFAULT_MODEL` | `haiku` | Default model when none is specified (`haiku`, `sonnet`, `opus`) |
-| `CLAUDEGATE_CONCURRENCY` | `1` | Number of parallel workers |
-| `CLAUDEGATE_DB_PATH` | `claudegate.db` | SQLite database file path |
-| `CLAUDEGATE_QUEUE_SIZE` | `1000` | In-memory queue capacity |
-| `CLAUDEGATE_JOB_TIMEOUT_MINUTES` | `0` | Per-job execution timeout in minutes (`0` = no timeout) |
-| `CLAUDEGATE_CORS_ORIGINS` | *(empty)* | Comma-separated allowed CORS origins (`*` = allow all, empty = disabled) |
-| `CLAUDEGATE_JOB_TTL_HOURS` | `0` | Auto-delete terminal jobs older than this many hours (`0` = disabled) |
-| `CLAUDEGATE_CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup runs in minutes (only when TTL is enabled) |
-
----
 
 ## API Reference
 
@@ -215,7 +185,7 @@ Response:
   "prompt": "Explain what a mutex is in one sentence.",
   "model": "haiku",
   "status": "queued",
-  "created_at": "2024-01-01T00:00:00Z"
+  "created_at": "2025-06-15T00:00:00Z"
 }
 ```
 
@@ -236,9 +206,9 @@ Response:
   "model": "haiku",
   "status": "completed",
   "result": "A mutex is a synchronization primitive that ensures only one goroutine accesses a shared resource at a time.",
-  "created_at": "2024-01-01T00:00:00Z",
-  "started_at": "2024-01-01T00:00:00.1Z",
-  "completed_at": "2024-01-01T00:00:02Z"
+  "created_at": "2025-06-15T00:00:00Z",
+  "started_at": "2025-06-15T00:00:00.1Z",
+  "completed_at": "2025-06-15T00:00:02Z"
 }
 ```
 
@@ -318,8 +288,6 @@ Response:
 {"status": "ok"}
 ```
 
----
-
 ## Docker
 
 ```bash
@@ -336,7 +304,7 @@ docker run -d \
   claudegate
 ```
 
----
+> **Note:** The Claude CLI must be available inside the container. Mount it as a volume or install it in the image.
 
 ## Systemd
 
@@ -359,8 +327,6 @@ systemctl enable --now claudegate
 # Follow live logs
 journalctl -u claudegate -f
 ```
-
----
 
 ## Security
 
@@ -390,8 +356,6 @@ Set `CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT=true` to remove the security system pr
 - Monitor logs for suspicious prompts
 - Consider network-level restrictions (firewall, VPN)
 - Run the service user with the most restrictive permissions possible
-
----
 
 ## Reverse Proxy (Production)
 
@@ -445,9 +409,7 @@ example.com {
 ```
 Caddy handles SSE streaming and TLS certificates automatically.
 
----
-
-## Architecture & Code Documentation
+## Architecture
 
 ### Overview
 
@@ -490,176 +452,6 @@ claudegate/
 └── claudegate.service       # systemd unit file for daemon mode
 ```
 
-### Component Details
-
-#### `cmd/claudegate/main.go` — Entry point
-
-**Role:** Wires all dependencies together, starts the server, handles shutdown.
-
-**Initialization order:**
-1. `config.Load()` — fail-fast if any required env var is missing or invalid
-2. `job.NewSQLiteStore()` — opens the DB, runs migrations, enables WAL mode
-3. `queue.New()` — allocates the buffered channel and subscriber map
-4. `q.Recovery()` — resets interrupted jobs before workers start (crash recovery)
-5. `q.Start(ctx)` — launches N worker goroutines
-6. `q.StartCleanup(ctx)` — starts TTL cleanup goroutine (if configured)
-7. `api.NewHandler()` + `RegisterRoutes()` + middleware chain — sets up HTTP
-8. `srv.ListenAndServe()` — starts accepting connections
-
-**Graceful shutdown:** A goroutine waits for `SIGINT` or `SIGTERM`. On signal it calls `cancel()` to stop all workers (they drain the context), then `srv.Shutdown()` with a 10-second timeout to let in-flight HTTP requests finish.
-
-**Middleware chain order (outer to inner):**
-```
-CORSMiddleware → LoggingMiddleware → RequestIDMiddleware → AuthMiddleware → mux
-```
-CORS is outermost so OPTIONS preflight requests are handled before hitting auth. Logging wraps everything after CORS so it captures the final status code. RequestID is set before auth so every request — including rejections — gets an ID. Auth sits just before the mux so all business routes are protected.
-
----
-
-#### `internal/config/config.go` — Configuration
-
-**Role:** Loads and validates all runtime configuration from environment variables.
-
-**Technical decisions:**
-- **Env vars only, no config file:** Follows the 12-factor app principle. The deployment environment (systemd `EnvironmentFile`, Docker `-e`, k8s secrets) is responsible for injecting values — the app itself has no `.env` loader.
-- **Fail-fast validation:** Every constraint (non-empty API keys, positive concurrency, valid model name) is checked at startup. The process exits immediately with a clear error rather than discovering a misconfiguration at runtime.
-- `CLAUDEGATE_API_KEYS` accepts a comma-separated list so multiple clients can use different keys without a restart.
-
----
-
-#### `internal/job/model.go` — Job model
-
-**Role:** Defines the `Job` struct, status constants, and the `CreateRequest` input type with its validation logic.
-
-**Technical decisions:**
-- **`Status` as a `string` type:** Stored and serialized as human-readable strings (`"queued"`, `"processing"`, etc.). Easier to inspect directly in the DB or in API responses than integer codes.
-- **`json.RawMessage` for `Metadata`:** The gateway passes metadata through without parsing or validating it. The caller owns the schema. Using `json.RawMessage` avoids double-encoding and preserves the exact original JSON.
-- **Pointer timestamps (`*time.Time`) for `StartedAt` / `CompletedAt`:** These fields are absent until the job reaches the relevant state. Pointers serialize to `null` in JSON and map cleanly to nullable `DATETIME` columns in SQLite.
-
----
-
-#### `internal/job/store.go` — Store interface
-
-**Role:** Declares the `Store` interface that decouples all callers from the concrete storage implementation.
-
-**Technical decisions:**
-- **Interface over concrete type:** `Queue`, `Handler`, and `main` all depend on `job.Store`, not on `*SQLiteStore`. This makes it straightforward to swap the backend (e.g., in-memory for tests, Postgres for a future migration) without touching any caller.
-- The interface surface is minimal — only the operations actually needed — which keeps both the interface and any future implementations simple.
-
----
-
-#### `internal/job/sqlite.go` — SQLite implementation
-
-**Role:** Implements `Store` using a local SQLite file. Handles schema migration and crash recovery.
-
-**Technical decisions:**
-- **SQLite over Postgres/Redis:** Zero external dependencies. A single file holds all state. More than sufficient for the workload where the bottleneck is the Claude CLI, not the DB.
-- **`modernc.org/sqlite` (pure Go):** No CGO required. The binary cross-compiles to any target with `CGO_ENABLED=0` and works out of the box in Alpine/scratch containers. The standard `mattn/go-sqlite3` requires a C compiler.
-- **WAL mode (`PRAGMA journal_mode=WAL`):** Write-Ahead Logging allows concurrent readers while a write is in progress. Without it, any write would lock the entire file, blocking polling requests while a job result is being written.
-- **Auto-migration on startup:** `migrate()` uses `CREATE TABLE IF NOT EXISTS` so it is idempotent and safe to run every time. No external migration tool needed.
-- **`ResetProcessing`:** Finds all jobs stuck in `"processing"` (left there by a previous crash) and moves them back to `"queued"`. Returns their IDs so the caller can re-enqueue them before starting workers, guaranteeing at-least-once execution.
-
----
-
-#### `internal/worker/worker.go` — Claude CLI execution
-
-**Role:** Spawns the Claude CLI as a subprocess, streams its output, and returns the final result.
-
-**Technical decisions:**
-- **`filteredEnv()` — critical:** The worker strips every environment variable whose name starts with `CLAUDE` before exec-ing the CLI. The Claude CLI detects an active session via `CLAUDE_*` variables and refuses to start a nested one (error: "nested session"). Since claudegate itself runs inside a Claude Code session during development, this filter is mandatory.
-- **`stream-json` format:** The CLI is invoked with `--output-format stream-json`. Each line is a self-contained JSON object. Two message types are handled:
-  - `"assistant"` — contains a `content` array of text blocks; extracted and forwarded as SSE chunks.
-  - `"result"` — the final aggregated response; stored as the job result.
-- **Stdout pipe + line scanner:** The output is consumed incrementally. Each line is parsed as it arrives so chunks are forwarded to SSE subscribers in real time, not buffered until the process exits.
-- **Context cancellation:** `exec.CommandContext` is used, so cancelling the context (on SIGTERM or client disconnect) sends SIGKILL to the subprocess automatically.
-
----
-
-#### `internal/queue/queue.go` — Job queue & worker pool
-
-**Role:** Manages the in-memory job queue, the worker goroutines, and the SSE subscriber fan-out.
-
-**Technical decisions:**
-- **Buffered channel as queue:** `make(chan string, cfg.QueueSize)` is all the queueing infrastructure needed. Job IDs (not full job structs) are enqueued — the worker fetches details from SQLite when it picks up the job. No Redis, no RabbitMQ. The bottleneck is the Claude CLI (seconds per job), not channel throughput.
-- **N worker goroutines:** `cfg.Concurrency` goroutines each run `runWorker`, which blocks on `<-q.jobs`. The pool size is static and set at startup.
-- **SSE fan-out via `map[string][]chan SSEEvent`:** Each job can have multiple concurrent SSE subscribers (multiple browser tabs, monitoring tools). The map is protected by a `sync.RWMutex` — reads (notify) hold a read lock, writes (subscribe/unsubscribe) hold a write lock.
-- **Non-blocking notify:** `notify()` uses a `select` with a `default` branch when sending to subscriber channels. A slow or disconnected client never blocks the worker.
-- **`notifyAndClose`:** Sends the final `"result"` event then deletes the job's entry from the map and closes all channels. Closed channels cause the SSE handler's `range` to exit cleanly.
-- **Job cancellation via `cancels map`:** Each processing job registers a `context.CancelFunc` in a map protected by the existing `sync.RWMutex`. The `Cancel(id)` method looks up and calls the function, which propagates to the `exec.CommandContext` in the worker, killing the Claude CLI subprocess. Queued jobs that were cancelled while waiting in the channel are detected at the start of `processJob` via a DB status check.
-- **TTL cleanup goroutine:** `StartCleanup()` runs a `time.Ticker`-based goroutine that periodically calls `store.DeleteTerminalBefore()` to remove old completed/failed/cancelled jobs. Disabled when `JobTTLHours == 0`.
-
----
-
-#### `internal/webhook/webhook.go` — Webhook delivery
-
-**Role:** POSTs the job result to a caller-supplied `callback_url` after completion.
-
-**Technical decisions:**
-- **Fire-and-forget goroutine:** `Send()` launches `send()` in a new goroutine and returns immediately. The worker is never blocked waiting for the remote server.
-- **3 retries with exponential backoff (1s → 2s → 4s):** Transient network failures or temporary server errors are retried automatically. After three failures the error is logged and delivery is abandoned — there is no dead-letter queue.
-- **30-second per-request timeout:** Prevents the goroutine from hanging indefinitely on a slow or unresponsive callback server.
-
----
-
-#### `internal/api/handler.go` — HTTP handlers
-
-**Role:** Implements the HTTP handlers for all REST endpoints using Go's standard `net/http` package.
-
-**Technical decisions:**
-- **Go 1.22 native routing with method+path patterns:** `"POST /api/v1/jobs"` and `"GET /api/v1/jobs/{id}"` — no external router needed. `r.PathValue("id")` extracts path parameters.
-- **`POST` returns `202 Accepted`:** The job is persisted and enqueued but not yet processed. `202` is the correct HTTP semantic for async operations.
-- **Validation before creation:** `req.Validate()` runs before any DB write. Invalid requests never touch the store.
-- **`store.Create` then `queue.Enqueue`:** The job is written to SQLite first. If the enqueue fails (queue full), the job record already exists and can be recovered at next startup via `ResetProcessing`. The reverse order would lose the job on queue failure.
-
----
-
-#### `internal/api/middleware.go` — Middleware stack
-
-**Role:** Provides authentication, request tracing, and structured access logging.
-
-**Technical decisions:**
-- **`subtle.ConstantTimeCompare` in `AuthMiddleware`:** A naive string comparison (`==`) short-circuits on the first mismatched byte, leaking timing information that an attacker could exploit to guess valid keys one byte at a time. Constant-time comparison always takes the same duration regardless of where the mismatch occurs.
-- **`/api/v1/health` exempt from auth:** Health checks must be reachable by load balancers and monitoring systems that don't have (or shouldn't need) an API key. The exemption is checked by path string before any key lookup.
-- **`RequestIDMiddleware`:** Generates a UUID per request, sets it on the response as `X-Request-ID`, and stores it in the request context. Downstream handlers and logs can correlate entries for the same request.
-- **`statusResponseWriter`:** A thin wrapper around `http.ResponseWriter` that captures the status code written by the handler. Required because `http.ResponseWriter` does not expose the code after `WriteHeader` is called, but `LoggingMiddleware` needs it to log the final status.
-- **`CORSMiddleware`:** Handles CORS headers and preflight `OPTIONS` requests. Configured via `CLAUDEGATE_CORS_ORIGINS`. When disabled (empty), the middleware is a no-op passthrough. When enabled, it reflects the request `Origin` if it matches the allowlist (or if `*` is configured), sets `Access-Control-Allow-Headers: Content-Type, X-API-Key`, and short-circuits `OPTIONS` with `204 No Content`.
-
----
-
-#### `internal/api/sse.go` — Server-Sent Events
-
-**Role:** Streams live job progress to clients over a persistent HTTP connection.
-
-**Technical decisions:**
-- **`http.Flusher` check before starting:** Not all `http.ResponseWriter` implementations support streaming (e.g., some test recorders). The check prevents a silent hang — if flushing is not available, the handler returns an error immediately.
-- **Already-terminal shortcut:** If the job is `completed`, `failed`, or `cancelled` by the time the client connects, the handler writes a single `"result"` event and closes the connection. No subscription needed. This handles the common case where the client polls SSE after the job has already finished.
-- **Subscribe → send initial status → stream:** After subscribing, the handler sends the current job status so the client has an initial state even if no new events arrive immediately. Then it loops over the channel until it is closed (job finished) or the client disconnects (`r.Context().Done()`).
-- **`defer h.queue.Unsubscribe`:** Guarantees the channel is removed from the fan-out map when the handler exits, regardless of whether the client disconnected or the job completed. Prevents a channel leak.
-
----
-
-### Infrastructure Files
-
-#### `Makefile` — Build automation
-
-Targets: `setup` (installs `mise` and Go toolchain), `build` (compiles binary to `bin/claudegate`), `test` (runs all tests with `-count=1` to bypass cache), `lint` (runs `golangci-lint`), `run` (build then execute), `clean` (removes `bin/`).
-
-#### `Dockerfile` — Multi-stage build
-
-**Stage 1 (`builder`):** Uses the official `golang` image. Copies `go.mod`/`go.sum` first to cache the module download layer, then copies source and builds with `CGO_ENABLED=0` for a fully static binary.
-
-**Stage 2 (runtime):** `debian:bookworm-slim` with only `ca-certificates` added (needed for outbound HTTPS webhook calls). The static binary is copied in. Result: a small image with no Go toolchain.
-
-#### `claudegate.service` — systemd unit
-
-Runs the binary as a `simple` service. `EnvironmentFile=/opt/claudegate/.env` injects configuration. `Restart=on-failure` with a 5-second delay restarts the process on crashes (combined with `ResetProcessing`, jobs interrupted by a crash are retried automatically). Logs go to the systemd journal via `StandardOutput=journal`.
-
-#### `testdata/mock-claude.sh` — CLI mock for tests
-
-A shell script that accepts the same arguments as the real Claude CLI and emits two lines of `stream-json`: one `"assistant"` message and one `"result"` message. Used in integration tests by setting `CLAUDEGATE_CLAUDE_PATH` to this script. Includes a 0.1-second sleep to simulate realistic latency.
-
----
-
 ### Design Decisions
 
 | Decision | Rationale |
@@ -672,8 +464,6 @@ A shell script that accepts the same arguments as the real Claude CLI and emits 
 | **`stream-json` parsing** | Native output format of the Claude CLI. Parsing it directly avoids wrapping the CLI in a PTY or scraping human-readable output. |
 | **Job ID only in channel** | Enqueueing the ID rather than the full `Job` struct keeps the channel payload tiny and ensures workers always read the latest state from the DB. |
 | **Constant-time key comparison** | Timing attacks on string equality are a real class of vulnerability for authentication secrets. `subtle.ConstantTimeCompare` costs nothing and closes the vector. |
-
----
 
 ## License
 
