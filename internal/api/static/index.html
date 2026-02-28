@@ -39,8 +39,10 @@ select option{background:var(--surface)}
 .key-status.invalid{background:var(--error)}
 
 .main{display:flex;flex:1;overflow:hidden}
-.panel-left{width:50%;border-right:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
-.panel-right{width:50%;overflow-y:auto;padding:16px}
+.panel-left{width:50%;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;flex-shrink:0}
+.panel-right{flex:1;overflow-y:auto;padding:16px;min-width:0}
+.splitter{width:4px;background:var(--border);cursor:col-resize;flex-shrink:0;transition:background .15s;user-select:none}
+.splitter:hover,.splitter.active{background:rgba(88,166,255,.5)}
 
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
 .card-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
@@ -107,6 +109,32 @@ select option{background:var(--surface)}
 .json-bool{color:#ff7b72}
 .json-null{color:#ff7b72}
 
+/* Try it */
+.tryit-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.tryit-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}
+.tryit-fields{display:flex;flex-direction:column;gap:6px}
+.tryit-field{display:flex;flex-direction:column;gap:3px}
+.tryit-field label{font-size:12px;color:var(--muted)}
+.tryit-row{display:flex;gap:8px;align-items:flex-end}
+.tryit-row .tryit-field{flex:1}
+.tryit-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn-tryit{background:var(--accent);color:#fff;padding:6px 14px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-tryit:disabled{opacity:.5;cursor:not-allowed}
+.btn-cancel-sse{background:none;border:1px solid var(--error);color:var(--error);padding:5px 12px;font-size:12px;border-radius:var(--radius)}
+.btn-cancel-sse:hover{background:rgba(248,81,73,.1);opacity:1}
+.btn-use-latest{background:none;border:1px solid var(--border);color:var(--muted);padding:4px 8px;font-size:11px;border-radius:var(--radius);white-space:nowrap}
+.btn-use-latest:hover{border-color:var(--accent);color:var(--accent);opacity:1}
+.tryit-response{display:none;flex-direction:column;gap:6px}
+.tryit-response.visible{display:flex}
+.tryit-response-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.http-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;font-family:var(--font-mono)}
+.http-badge-2xx{background:rgba(63,185,80,.15);color:var(--success)}
+.http-badge-3xx{background:rgba(88,166,255,.15);color:var(--accent)}
+.http-badge-4xx{background:rgba(248,81,73,.15);color:var(--error)}
+.http-badge-5xx{background:rgba(248,81,73,.15);color:var(--error)}
+.tryit-headers{font-family:var(--font-mono);font-size:11px;color:var(--muted);padding:4px 8px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)}
+.tryit-body{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:var(--font-mono);font-size:12px;max-height:240px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.6}
+
 /* Scrollbar */
 ::-webkit-scrollbar{width:6px;height:6px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -116,8 +144,9 @@ select option{background:var(--surface)}
 /* Responsive */
 @media(max-width:700px){
   .main{flex-direction:column}
-  .panel-left,.panel-right{width:100%}
+  .panel-left,.panel-right{width:100%!important}
   .panel-left{border-right:none;border-bottom:1px solid var(--border)}
+  .splitter{display:none}
 }
 </style>
 </head>
@@ -187,9 +216,7 @@ select option{background:var(--surface)}
               <span id="statusBadge"></span>
               <span id="jobIdDisplay" style="font-family:var(--font-mono);font-size:11px;color:var(--muted)"></span>
             </div>
-            <div class="response-box" id="responseBox">
-              <span class="response-empty">Response will appear here...</span>
-            </div>
+            <div class="response-box" id="responseBox"><span class="response-empty">Response will appear here...</span></div>
           </div>
         </div>
       </div>
@@ -206,6 +233,9 @@ select option{background:var(--surface)}
       </div>
 
     </div>
+
+    <!-- Draggable splitter -->
+    <div class="splitter" id="splitter"></div>
 
     <!-- Right panel: API Docs -->
     <div class="panel-right">
@@ -521,7 +551,8 @@ const endpoints = [
   "model": "haiku",
   "status": "queued",
   "created_at": "2025-01-01T00:00:00Z"
-}`
+}`,
+    tryit: { type: 'post-job' }
   },
   {
     method: 'GET', path: '/api/v1/jobs',
@@ -533,7 +564,8 @@ const endpoints = [
   "total": 42,
   "limit": 10,
   "offset": 0
-}`
+}`,
+    tryit: { type: 'list-jobs' }
   },
   {
     method: 'GET', path: '/api/v1/jobs/{id}',
@@ -548,7 +580,8 @@ const endpoints = [
   "created_at": "2025-01-01T00:00:00Z",
   "started_at": "2025-01-01T00:00:00.1Z",
   "completed_at": "2025-01-01T00:00:02Z"
-}`
+}`,
+    tryit: { type: 'get-job' }
   },
   {
     method: 'GET', path: '/api/v1/jobs/{id}/sse',
@@ -559,23 +592,26 @@ const endpoints = [
 data: {"job_id":"...","status":"processing"}
 
 event: chunk
-data: {"chunk":"A mutex "}
+data: {"text":"A mutex "}
 
 event: result
-data: {"job_id":"...","status":"completed","result":"A mutex..."}`
+data: {"job_id":"...","status":"completed","result":"A mutex..."}`,
+    tryit: { type: 'sse-job' }
   },
   {
     method: 'DELETE', path: '/api/v1/jobs/{id}',
     desc: 'Delete a job record. Returns 204 No Content.',
     curl: `curl -X DELETE "https://example.com/api/v1/jobs/a1b2c3d4-..." \\
   -H "X-API-Key: your-key"`,
-    response: `HTTP/1.1 204 No Content`
+    response: `HTTP/1.1 204 No Content`,
+    tryit: { type: 'delete-job' }
   },
   {
     method: 'GET', path: '/api/v1/health',
     desc: 'Health check. No authentication required.',
     curl: `curl "https://example.com/api/v1/health"`,
-    response: `{"status": "ok"}`
+    response: `{"status": "ok"}`,
+    tryit: { type: 'health' }
   }
 ];
 
@@ -587,6 +623,312 @@ function highlightJSON(str) {
     .replace(/:\s*(-?\d+(?:\.\d+)?)/g, ': <span class="json-num">$1</span>')
     .replace(/:\s*(true|false)/g, ': <span class="json-bool">$1</span>')
     .replace(/:\s*(null)/g, ': <span class="json-null">$1</span>');
+}
+
+function buildTryitHTML(ep, i) {
+  const t = ep.tryit.type;
+  var fields = '';
+
+  if (t === 'post-job') {
+    fields =
+      '<div class="tryit-field">' +
+        '<label>prompt <span style="color:var(--error)">*</span></label>' +
+        '<textarea id="ti-'+i+'-prompt" rows="3" placeholder="Ask something..."></textarea>' +
+      '</div>' +
+      '<div class="tryit-row">' +
+        '<div class="tryit-field">' +
+          '<label>model</label>' +
+          '<select id="ti-'+i+'-model">' +
+            '<option value="haiku">claude-haiku</option>' +
+            '<option value="sonnet">claude-sonnet</option>' +
+            '<option value="opus">claude-opus</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="tryit-field">' +
+          '<label>system_prompt</label>' +
+          '<input type="text" id="ti-'+i+'-system" placeholder="optional">' +
+        '</div>' +
+        '<label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;padding-bottom:7px">' +
+          '<input type="checkbox" id="ti-'+i+'-json"> JSON mode' +
+        '</label>' +
+      '</div>';
+  } else if (t === 'list-jobs') {
+    fields =
+      '<div class="tryit-row">' +
+        '<div class="tryit-field">' +
+          '<label>limit</label>' +
+          '<input type="number" id="ti-'+i+'-limit" value="20" min="1" max="100">' +
+        '</div>' +
+        '<div class="tryit-field">' +
+          '<label>offset</label>' +
+          '<input type="number" id="ti-'+i+'-offset" value="0" min="0">' +
+        '</div>' +
+      '</div>';
+  } else if (t === 'get-job' || t === 'sse-job' || t === 'delete-job') {
+    fields =
+      '<div class="tryit-field">' +
+        '<label>job_id</label>' +
+        '<div style="display:flex;gap:6px">' +
+          '<input type="text" id="ti-'+i+'-jobid" placeholder="a1b2c3d4-e5f6-..." style="flex:1">' +
+          '<button class="btn-use-latest" id="ti-'+i+'-latest">Use latest</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  var cancelBtn = t === 'sse-job' ? '<button class="btn-cancel-sse" id="ti-'+i+'-cancel" style="display:none">&#9632; Cancel</button>' : '';
+
+  return '<div class="tryit-section">' +
+    '<div class="tryit-label">Try it</div>' +
+    (fields ? '<div class="tryit-fields">' + fields + '</div>' : '') +
+    '<div class="tryit-actions">' +
+      '<button class="btn-tryit" id="ti-'+i+'-btn">&#9654; Send Request</button>' +
+      cancelBtn +
+    '</div>' +
+    '<div class="tryit-response" id="ti-'+i+'-resp">' +
+      '<div class="tryit-response-meta">' +
+        '<span id="ti-'+i+'-status-badge"></span>' +
+        '<div class="tryit-headers" id="ti-'+i+'-headers" style="display:none"></div>' +
+      '</div>' +
+      '<div class="tryit-body" id="ti-'+i+'-body"></div>' +
+    '</div>' +
+  '</div>';
+}
+
+function getLatestJobId() {
+  const btn = jobList.querySelector('.job-item .btn-delete');
+  return btn ? btn.dataset.id : '';
+}
+
+function httpBadgeHTML(status) {
+  var cls = 'http-badge-5xx';
+  if (status >= 200 && status < 300) cls = 'http-badge-2xx';
+  else if (status >= 300 && status < 400) cls = 'http-badge-3xx';
+  else if (status >= 400 && status < 500) cls = 'http-badge-4xx';
+  return '<span class="http-badge ' + cls + '">HTTP ' + status + '</span>';
+}
+
+function showTryitResponse(i, statusCode, headersText, bodyHTML) {
+  var resp = document.getElementById('ti-'+i+'-resp');
+  var badge = document.getElementById('ti-'+i+'-status-badge');
+  var headersEl = document.getElementById('ti-'+i+'-headers');
+  var bodyEl = document.getElementById('ti-'+i+'-body');
+  badge.innerHTML = httpBadgeHTML(statusCode);
+  if (headersText) {
+    headersEl.textContent = headersText;
+    headersEl.style.display = '';
+  } else {
+    headersEl.style.display = 'none';
+  }
+  bodyEl.innerHTML = bodyHTML;
+  resp.classList.add('visible');
+  bodyEl.scrollTop = 0;
+}
+
+function extractHeaders(r) {
+  var parts = [];
+  var ct = r.headers.get('Content-Type');
+  var rid = r.headers.get('X-Request-ID');
+  if (ct) parts.push('Content-Type: ' + ct);
+  if (rid) parts.push('X-Request-ID: ' + rid);
+  return parts.join('\n');
+}
+
+function tryitSend(ep, i) {
+  const t = ep.tryit.type;
+  const btn = document.getElementById('ti-'+i+'-btn');
+  const bodyEl = document.getElementById('ti-'+i+'-body');
+  const resp = document.getElementById('ti-'+i+'-resp');
+
+  if (!apiKey && t !== 'health') {
+    alert('Please enter and save your API key first.');
+    return;
+  }
+
+  btn.disabled = true;
+
+  if (t === 'post-job') {
+    const prompt = document.getElementById('ti-'+i+'-prompt').value.trim();
+    if (!prompt) { document.getElementById('ti-'+i+'-prompt').focus(); btn.disabled = false; return; }
+    const body = { prompt, model: document.getElementById('ti-'+i+'-model').value };
+    const sp = document.getElementById('ti-'+i+'-system').value.trim();
+    if (sp) body.system_prompt = sp;
+    if (document.getElementById('ti-'+i+'-json').checked) body.response_format = 'json';
+
+    fetch(api('api/v1/jobs'), {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body)
+    }).then(function(r) {
+      var hdr = extractHeaders(r);
+      return r.text().then(function(txt) {
+        var highlighted;
+        try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
+        catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        showTryitResponse(i, r.status, hdr, highlighted);
+        btn.disabled = false;
+        if (r.ok) loadHistory();
+      });
+    }).catch(function(e) {
+      resp.classList.add('visible');
+      bodyEl.textContent = 'Network error: ' + e.message;
+      btn.disabled = false;
+    });
+
+  } else if (t === 'list-jobs') {
+    const limit = document.getElementById('ti-'+i+'-limit').value || '20';
+    const offset = document.getElementById('ti-'+i+'-offset').value || '0';
+    fetch(api('api/v1/jobs?limit=' + limit + '&offset=' + offset), {
+      headers: authHeaders()
+    }).then(function(r) {
+      var hdr = extractHeaders(r);
+      return r.text().then(function(txt) {
+        var highlighted;
+        try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
+        catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        showTryitResponse(i, r.status, hdr, highlighted);
+        btn.disabled = false;
+      });
+    }).catch(function(e) {
+      resp.classList.add('visible');
+      bodyEl.textContent = 'Network error: ' + e.message;
+      btn.disabled = false;
+    });
+
+  } else if (t === 'get-job') {
+    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
+    fetch(api('api/v1/jobs/' + jobId), { headers: authHeaders() })
+      .then(function(r) {
+        var hdr = extractHeaders(r);
+        return r.text().then(function(txt) {
+          var highlighted;
+          try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
+          catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+          showTryitResponse(i, r.status, hdr, highlighted);
+          btn.disabled = false;
+        });
+      }).catch(function(e) {
+        resp.classList.add('visible');
+        bodyEl.textContent = 'Network error: ' + e.message;
+        btn.disabled = false;
+      });
+
+  } else if (t === 'delete-job') {
+    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
+    fetch(api('api/v1/jobs/' + jobId), { method: 'DELETE', headers: authHeaders() })
+      .then(function(r) {
+        var hdr = extractHeaders(r);
+        return r.text().then(function(txt) {
+          var body204 = r.status === 204 ? '(no content)' : (txt || '');
+          showTryitResponse(i, r.status, hdr, body204.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'));
+          btn.disabled = false;
+          if (r.ok) loadHistory();
+        });
+      }).catch(function(e) {
+        resp.classList.add('visible');
+        bodyEl.textContent = 'Network error: ' + e.message;
+        btn.disabled = false;
+      });
+
+  } else if (t === 'sse-job') {
+    const jobId = document.getElementById('ti-'+i+'-jobid').value.trim();
+    if (!jobId) { document.getElementById('ti-'+i+'-jobid').focus(); btn.disabled = false; return; }
+    const cancelBtn = document.getElementById('ti-'+i+'-cancel');
+    cancelBtn.style.display = '';
+    resp.classList.add('visible');
+    bodyEl.innerHTML = '';
+    document.getElementById('ti-'+i+'-status-badge').innerHTML = '';
+    document.getElementById('ti-'+i+'-headers').style.display = 'none';
+
+    const ctrl = new AbortController();
+    cancelBtn._abort = ctrl;
+    cancelBtn.onclick = function() {
+      ctrl.abort();
+      cancelBtn.style.display = 'none';
+      btn.disabled = false;
+    };
+
+    fetch(api('api/v1/jobs/' + jobId + '/sse'), { headers: authHeaders(), signal: ctrl.signal })
+      .then(function(r) {
+        document.getElementById('ti-'+i+'-status-badge').innerHTML = httpBadgeHTML(r.status);
+        var hdr = extractHeaders(r);
+        if (hdr) {
+          var hdEl = document.getElementById('ti-'+i+'-headers');
+          hdEl.textContent = hdr;
+          hdEl.style.display = '';
+        }
+        if (!r.ok) {
+          return r.text().then(function(txt) {
+            bodyEl.textContent = txt || r.statusText;
+            cancelBtn.style.display = 'none';
+            btn.disabled = false;
+          });
+        }
+        const reader = r.body.getReader();
+        const decoder = new TextDecoder();
+        var buf = '';
+
+        function pump() {
+          reader.read().then(function(chunk) {
+            if (chunk.done) { cancelBtn.style.display = 'none'; btn.disabled = false; return; }
+            buf += decoder.decode(chunk.value, { stream: true });
+            var parts = buf.split('\n\n');
+            buf = parts.pop();
+            parts.forEach(function(raw) {
+              var lines = raw.split('\n');
+              var eventName = '', dataStr = '';
+              lines.forEach(function(line) {
+                if (line.startsWith('event: ')) eventName = line.slice(7).trim();
+                else if (line.startsWith('data: ')) dataStr = line.slice(6).trim();
+              });
+              if (!dataStr) return;
+              var label = document.createElement('div');
+              label.style.cssText = 'color:var(--muted);font-size:11px;margin-top:6px';
+              label.textContent = 'event: ' + eventName;
+              var pre = document.createElement('div');
+              try { pre.innerHTML = highlightJSON(JSON.stringify(JSON.parse(dataStr), null, 2)); }
+              catch(e) { pre.textContent = dataStr; }
+              bodyEl.appendChild(label);
+              bodyEl.appendChild(pre);
+              bodyEl.scrollTop = bodyEl.scrollHeight;
+            });
+            pump();
+          }).catch(function(e) {
+            if (e.name !== 'AbortError') {
+              var d = document.createElement('div');
+              d.style.color = 'var(--error)';
+              d.textContent = 'Stream error: ' + e.message;
+              bodyEl.appendChild(d);
+            }
+            cancelBtn.style.display = 'none';
+            btn.disabled = false;
+          });
+        }
+        pump();
+      }).catch(function(e) {
+        if (e.name !== 'AbortError') { bodyEl.textContent = 'SSE error: ' + e.message; }
+        cancelBtn.style.display = 'none';
+        btn.disabled = false;
+      });
+
+  } else if (t === 'health') {
+    fetch(api('api/v1/health'))
+      .then(function(r) {
+        var hdr = extractHeaders(r);
+        return r.text().then(function(txt) {
+          var highlighted;
+          try { highlighted = highlightJSON(JSON.stringify(JSON.parse(txt), null, 2)); }
+          catch(e) { highlighted = txt.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+          showTryitResponse(i, r.status, hdr, highlighted);
+          btn.disabled = false;
+        });
+      }).catch(function(e) {
+        resp.classList.add('visible');
+        bodyEl.textContent = 'Network error: ' + e.message;
+        btn.disabled = false;
+      });
+  }
 }
 
 function buildDocs() {
@@ -608,7 +950,7 @@ function buildDocs() {
         '<div>' +
           '<div class="code-label">curl example</div>' +
           '<div class="code-block" style="position:relative">' +
-            '<button class="btn-copy" data-copy="'+i+'-curl">Copy</button>' +
+            '<button class="btn-copy" data-copy="'+i+'">Copy</button>' +
             '<code>'+curlEscaped+'</code>' +
           '</div>' +
         '</div>' +
@@ -616,6 +958,7 @@ function buildDocs() {
           '<div class="code-label">example response</div>' +
           '<div class="code-block"><code>'+respHighlighted+'</code></div>' +
         '</div>' +
+        buildTryitHTML(ep, i) +
       '</div>';
 
     div.querySelector('.endpoint-head').addEventListener('click', () => {
@@ -635,12 +978,94 @@ function buildDocs() {
       } catch {}
     });
 
+    const tryBtn = div.querySelector('#ti-'+i+'-btn');
+    if (tryBtn) {
+      tryBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        tryitSend(ep, i);
+      });
+    }
+
+    const latestBtn = div.querySelector('#ti-'+i+'-latest');
+    if (latestBtn) {
+      latestBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        const id = getLatestJobId();
+        if (id) document.getElementById('ti-'+i+'-jobid').value = id;
+        else alert('No jobs in history yet.');
+      });
+    }
+
     container.appendChild(div);
   });
 }
 
 buildDocs();
 if (apiKey) loadHistory();
+
+// ── Splitter ──────────────────────────────────────────────────────────────────
+(function() {
+  var splitter = document.getElementById('splitter');
+  var panelLeft = document.querySelector('.panel-left');
+  var main = document.querySelector('.main');
+  var dragging = false;
+  var MIN_PCT = 20;
+
+  function clamp(val, lo, hi) { return val < lo ? lo : val > hi ? hi : val; }
+
+  function applyWidth(pct) {
+    pct = clamp(pct, MIN_PCT, 100 - MIN_PCT);
+    panelLeft.style.width = pct + '%';
+    localStorage.setItem('cg_split_pos', pct);
+  }
+
+  // Restore saved position
+  var saved = parseFloat(localStorage.getItem('cg_split_pos'));
+  if (saved && saved >= MIN_PCT && saved <= 100 - MIN_PCT) {
+    panelLeft.style.width = saved + '%';
+  }
+
+  function startDrag(clientX) {
+    dragging = true;
+    splitter.classList.add('active');
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }
+
+  function onMove(clientX) {
+    if (!dragging) return;
+    var rect = main.getBoundingClientRect();
+    var pct = ((clientX - rect.left) / rect.width) * 100;
+    applyWidth(pct);
+  }
+
+  function stopDrag() {
+    if (!dragging) return;
+    dragging = false;
+    splitter.classList.remove('active');
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+  }
+
+  splitter.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    startDrag(e.clientX);
+  });
+
+  document.addEventListener('mousemove', function(e) { onMove(e.clientX); });
+  document.addEventListener('mouseup', stopDrag);
+
+  splitter.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    startDrag(e.touches[0].clientX);
+  }, { passive: false });
+
+  document.addEventListener('touchmove', function(e) {
+    if (dragging) { e.preventDefault(); onMove(e.touches[0].clientX); }
+  }, { passive: false });
+
+  document.addEventListener('touchend', stopDrag);
+}());
 
 })();
 </script>

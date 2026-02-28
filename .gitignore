@@ -1,5 +1,5 @@
 bin/
-claudegate
+/claudegate
 CLAUDE.md
 *.db
 *.db-wal

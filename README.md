@@ -6,10 +6,14 @@ HTTP gateway that wraps Claude Code CLI as a REST API with an async job queue.
 
 - Async job queue with configurable concurrency
 - Three result delivery modes: polling, SSE (Server-Sent Events), and webhook callback
+- Built-in web playground with job history and API documentation (served at `/`)
+- JSON response mode (`response_format: "json"`) with automatic code fence stripping
 - Multi-model support: haiku, sonnet, opus
 - SQLite-backed job persistence with crash recovery
-- API key authentication
+- API key authentication with constant-time comparison
+- SSRF protection on webhook callback URLs
 - Optional system prompt and metadata per job
+- Single static binary (pure Go, no CGO) with embedded frontend
 
 ## Quick Start
 
@@ -44,7 +48,7 @@ All configuration is via environment variables.
 
 ## API Reference
 
-All endpoints (except `/api/v1/health`) require the `X-API-Key` header.
+All endpoints (except `/` and `/api/v1/health`) require the `X-API-Key` header.
 
 ### POST /api/v1/jobs
 
@@ -98,6 +102,25 @@ Response:
 
 Job statuses: `queued`, `processing`, `completed`, `failed`.
 
+### GET /api/v1/jobs
+
+List jobs with pagination. Returns `200 OK`.
+
+```bash
+curl "http://localhost:8080/api/v1/jobs?limit=10&offset=0" \
+  -H "X-API-Key: your-secret-key-here"
+```
+
+Response:
+```json
+{
+  "jobs": [{"job_id": "...", "status": "completed", ...}],
+  "total": 42,
+  "limit": 10,
+  "offset": 0
+}
+```
+
 ### GET /api/v1/jobs/{id}/sse
 
 Stream job progress via Server-Sent Events. The connection closes automatically when the job finishes.
@@ -109,7 +132,8 @@ curl -N http://localhost:8080/api/v1/jobs/a1b2c3d4-.../sse \
 
 Events emitted:
 - `status` — job moved to `processing`
-- `chunk` — incremental text from the model
+- `chunk` — incremental text from the model (payload: `{"text": "..."}`)
+
 - `result` — final status, result, and error (connection closes after this)
 
 ### DELETE /api/v1/jobs/{id}

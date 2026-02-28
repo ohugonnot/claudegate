@@ -48,8 +48,11 @@ func main() {
 	)
 
 	srv := &http.Server{
-		Addr:    cfg.ListenAddr,
-		Handler: handler,
+		Addr:         cfg.ListenAddr,
+		Handler:      handler,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	go func() {
