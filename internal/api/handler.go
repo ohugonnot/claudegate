@@ -1,0 +1,129 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http"
+	"time"
+
+	"github.com/claudegate/claudegate/internal/config"
+	"github.com/claudegate/claudegate/internal/job"
+	"github.com/claudegate/claudegate/internal/queue"
+	"github.com/google/uuid"
+)
+
+// Handler holds the dependencies for all HTTP handlers.
+type Handler struct {
+	store job.Store
+	queue *queue.Queue
+	cfg   *config.Config
+}
+
+// NewHandler constructs a Handler with the given dependencies.
+func NewHandler(store job.Store, q *queue.Queue, cfg *config.Config) *Handler {
+	return &Handler{store: store, queue: q, cfg: cfg}
+}
+
+// RegisterRoutes registers all API routes on mux.
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("POST /api/v1/jobs", h.CreateJob)
+	mux.HandleFunc("GET /api/v1/jobs/{id}", h.GetJob)
+	mux.HandleFunc("DELETE /api/v1/jobs/{id}", h.DeleteJob)
+	mux.HandleFunc("GET /api/v1/jobs/{id}/sse", h.StreamSSE)
+	mux.HandleFunc("GET /api/v1/health", h.Health)
+}
+
+// CreateJob handles POST /api/v1/jobs and responds 202 with the created job.
+func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
+	var req job.CreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if req.Model == "" {
+		req.Model = h.cfg.DefaultModel
+	}
+
+	if err := req.Validate(); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	now := time.Now().UTC()
+	j := &job.Job{
+		ID:           uuid.New().String(),
+		Prompt:       req.Prompt,
+		Model:        req.Model,
+		CallbackURL:  req.CallbackURL,
+		SystemPrompt: req.SystemPrompt,
+		Metadata:     req.Metadata,
+		Status:       job.StatusQueued,
+		CreatedAt:    now,
+	}
+
+	if err := h.store.Create(r.Context(), j); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to create job")
+		return
+	}
+
+	if err := h.queue.Enqueue(j.ID); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to enqueue job")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, j)
+}
+
+// GetJob handles GET /api/v1/jobs/{id} and responds 200 with the job.
+func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	j, err := h.store.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
+		return
+	}
+	if j == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, j)
+}
+
+// DeleteJob handles DELETE /api/v1/jobs/{id} and responds 204.
+func (h *Handler) DeleteJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	j, err := h.store.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
+		return
+	}
+	if j == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if err := h.store.Delete(r.Context(), id); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete job")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Health handles GET /api/v1/health and responds 200.
+func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func writeJSON(w http.ResponseWriter, status int, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data) //nolint:errcheck
+}
+
+func writeError(w http.ResponseWriter, status int, message string) {
+	writeJSON(w, status, map[string]string{"error": message})
+}

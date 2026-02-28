@@ -1,0 +1,6 @@
+bin/
+claudegate
+*.db
+*.db-wal
+*.db-shm
+.env

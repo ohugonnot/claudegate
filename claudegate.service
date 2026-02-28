@@ -1,0 +1,16 @@
+[Unit]
+Description=ClaudeGate - Claude Code API Gateway
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/claudegate/bin/claudegate
+WorkingDirectory=/opt/claudegate
+EnvironmentFile=/opt/claudegate/.env
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
