@@ -290,21 +290,44 @@ Response:
 
 ## Docker
 
-```bash
-# Build image
-docker build -t claudegate .
+The image bundles Claude Code CLI. You only need to mount your host credentials — no extra installation inside the container.
 
-# Run
+**1. Build the image**
+
+```bash
+docker build -t claudegate .
+```
+
+**2. Authenticate Claude on the host** (one-time setup)
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude  # follow the prompts to log in
+```
+
+This writes auth tokens to `~/.claude/` on the host, which you mount read-only into the container.
+
+**3. Run**
+
+```bash
 docker run -d \
+  --name claudegate \
   -p 8080:8080 \
-  -e CLAUDEGATE_API_KEYS=your-secret-key-here \
-  -e CLAUDEGATE_CLAUDE_PATH=/usr/local/bin/claude \
-  -v $(pwd)/data:/data \
-  -e CLAUDEGATE_DB_PATH=/data/claudegate.db \
+  -v ~/.claude:/home/claudegate/.claude:ro \
+  -v claudegate-data:/app/data \
+  -e CLAUDEGATE_API_KEYS=your-secret-key \
   claudegate
 ```
 
-> **Note:** The Claude CLI must be available inside the container. Mount it as a volume or install it in the image.
+| Flag | Purpose |
+|---|---|
+| `-v ~/.claude/.../:ro` | Mount host Claude auth tokens (read-only) |
+| `-v claudegate-data:/app/data` | Persist the SQLite job database |
+| `-e CLAUDEGATE_API_KEYS` | Required: API key(s) for authentication |
+
+**4. Security note**
+
+The container isolates Claude CLI from the host. Even if the API is compromised, the attacker is confined to the container with no access to the host filesystem or network beyond what Docker allows. The credentials volume is mounted read-only, so the container cannot modify your auth tokens.
 
 ## Systemd
 
