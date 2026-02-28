@@ -1,6 +1,9 @@
 package job
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Store persists and retrieves jobs.
 type Store interface {
@@ -14,4 +17,7 @@ type Store interface {
 	ResetProcessing(ctx context.Context) ([]string, error)
 	// List returns a page of jobs ordered by created_at DESC, plus the total count.
 	List(ctx context.Context, limit, offset int) ([]*Job, int, error)
+	// DeleteTerminalBefore deletes terminal jobs (completed, failed, cancelled) older than the given time.
+	// Returns the number of deleted rows.
+	DeleteTerminalBefore(ctx context.Context, before time.Time) (int64, error)
 }

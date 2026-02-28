@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/claudegate/claudegate/internal/job"
 )
 
 // StreamSSE handles GET /api/v1/jobs/{id}/sse.
@@ -34,7 +32,7 @@ func (h *Handler) StreamSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 
 	// If already terminal, send the result event and close immediately.
-	if j.Status == job.StatusCompleted || j.Status == job.StatusFailed {
+	if j.Status.IsTerminal() {
 		writeSSEEvent(w, flusher, "result", j)
 		return
 	}

@@ -52,8 +52,9 @@ func (s *SQLiteStore) migrate() error {
 			started_at      DATETIME,
 			completed_at    DATETIME
 		);
-		CREATE INDEX IF NOT EXISTS idx_jobs_status     ON jobs(status);
-		CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);
+		CREATE INDEX IF NOT EXISTS idx_jobs_status       ON jobs(status);
+		CREATE INDEX IF NOT EXISTS idx_jobs_created_at   ON jobs(created_at);
+		CREATE INDEX IF NOT EXISTS idx_jobs_completed_at ON jobs(completed_at);
 	`)
 	if err != nil {
 		return err
@@ -127,7 +128,7 @@ func (s *SQLiteStore) UpdateStatus(ctx context.Context, id string, status Status
 	now := time.Now().UTC()
 
 	var completedAt interface{}
-	if status == StatusCompleted || status == StatusFailed {
+	if status == StatusCompleted || status == StatusFailed || status == StatusCancelled {
 		completedAt = now
 	}
 
@@ -260,6 +261,19 @@ func (s *SQLiteStore) List(ctx context.Context, limit, offset int) ([]*Job, int,
 	}
 
 	return jobs, total, nil
+}
+
+func (s *SQLiteStore) DeleteTerminalBefore(ctx context.Context, before time.Time) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `
+		DELETE FROM jobs
+		WHERE status IN (?, ?, ?)
+		AND completed_at IS NOT NULL
+		AND completed_at < ?
+	`, StatusCompleted, StatusFailed, StatusCancelled, before.UTC())
+	if err != nil {
+		return 0, fmt.Errorf("delete terminal jobs: %w", err)
+	}
+	return res.RowsAffected()
 }
 
 // nullableJSON returns nil if b is empty, otherwise returns the raw bytes as a string.

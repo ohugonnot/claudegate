@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -242,6 +243,55 @@ func TestListJobs_Returns200(t *testing.T) {
 	}
 	if int(result["total"].(float64)) != 3 {
 		t.Errorf("total = %v, want 3", result["total"])
+	}
+}
+
+func TestCancelJob_Queued_Returns200(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	body, _ := json.Marshal(map[string]string{"prompt": "cancel me"})
+	createResp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs", body, true)
+	defer createResp.Body.Close()
+
+	var created map[string]interface{}
+	json.NewDecoder(createResp.Body).Decode(&created)
+	jobID := created["job_id"].(string)
+
+	cancelResp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs/"+jobID+"/cancel", nil, true)
+	defer cancelResp.Body.Close()
+	if cancelResp.StatusCode != http.StatusOK {
+		t.Fatalf("cancel: status = %d, want 200", cancelResp.StatusCode)
+	}
+}
+
+func TestCancelJob_Terminal_Returns409(t *testing.T) {
+	srv, store := newTestServer(t)
+
+	body, _ := json.Marshal(map[string]string{"prompt": "already done"})
+	createResp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs", body, true)
+	defer createResp.Body.Close()
+
+	var created map[string]interface{}
+	json.NewDecoder(createResp.Body).Decode(&created)
+	jobID := created["job_id"].(string)
+
+	// Manually mark as completed.
+	store.UpdateStatus(context.Background(), jobID, job.StatusCompleted, "done", "") //nolint:errcheck
+
+	cancelResp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs/"+jobID+"/cancel", nil, true)
+	defer cancelResp.Body.Close()
+	if cancelResp.StatusCode != http.StatusConflict {
+		t.Fatalf("cancel terminal: status = %d, want 409", cancelResp.StatusCode)
+	}
+}
+
+func TestCancelJob_NotFound_Returns404(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	resp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs/does-not-exist/cancel", nil, true)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("cancel not found: status = %d, want 404", resp.StatusCode)
 	}
 }
 

@@ -12,6 +12,10 @@ func TestLoad_AllVarsSet(t *testing.T) {
 	t.Setenv("CLAUDEGATE_CONCURRENCY", "4")
 	t.Setenv("CLAUDEGATE_DB_PATH", "/tmp/test.db")
 	t.Setenv("CLAUDEGATE_QUEUE_SIZE", "500")
+	t.Setenv("CLAUDEGATE_JOB_TIMEOUT_MINUTES", "30")
+	t.Setenv("CLAUDEGATE_CORS_ORIGINS", "https://example.com,https://other.com")
+	t.Setenv("CLAUDEGATE_JOB_TTL_HOURS", "48")
+	t.Setenv("CLAUDEGATE_CLEANUP_INTERVAL_MINUTES", "30")
 
 	cfg, err := Load()
 	if err != nil {
@@ -40,6 +44,18 @@ func TestLoad_AllVarsSet(t *testing.T) {
 	}
 	if cfg.QueueSize != 500 {
 		t.Errorf("QueueSize = %d, want 500", cfg.QueueSize)
+	}
+	if cfg.JobTimeoutMinutes != 30 {
+		t.Errorf("JobTimeoutMinutes = %d, want 30", cfg.JobTimeoutMinutes)
+	}
+	if len(cfg.CORSOrigins) != 2 {
+		t.Errorf("CORSOrigins len = %d, want 2", len(cfg.CORSOrigins))
+	}
+	if cfg.JobTTLHours != 48 {
+		t.Errorf("JobTTLHours = %d, want 48", cfg.JobTTLHours)
+	}
+	if cfg.CleanupIntervalMinutes != 30 {
+		t.Errorf("CleanupIntervalMinutes = %d, want 30", cfg.CleanupIntervalMinutes)
 	}
 }
 
@@ -72,6 +88,9 @@ func TestLoad_Defaults(t *testing.T) {
 	t.Setenv("CLAUDEGATE_CONCURRENCY", "")
 	t.Setenv("CLAUDEGATE_DB_PATH", "")
 	t.Setenv("CLAUDEGATE_QUEUE_SIZE", "")
+	t.Setenv("CLAUDEGATE_JOB_TIMEOUT_MINUTES", "")
+	t.Setenv("CLAUDEGATE_JOB_TTL_HOURS", "")
+	t.Setenv("CLAUDEGATE_CLEANUP_INTERVAL_MINUTES", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -94,5 +113,14 @@ func TestLoad_Defaults(t *testing.T) {
 	}
 	if cfg.QueueSize != 1000 {
 		t.Errorf("default QueueSize = %d, want 1000", cfg.QueueSize)
+	}
+	if cfg.JobTimeoutMinutes != 0 {
+		t.Errorf("default JobTimeoutMinutes = %d, want 0", cfg.JobTimeoutMinutes)
+	}
+	if cfg.JobTTLHours != 0 {
+		t.Errorf("default JobTTLHours = %d, want 0", cfg.JobTTLHours)
+	}
+	if cfg.CleanupIntervalMinutes != 60 {
+		t.Errorf("default CleanupIntervalMinutes = %d, want 60", cfg.CleanupIntervalMinutes)
 	}
 }

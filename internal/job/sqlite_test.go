@@ -223,6 +223,62 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestDeleteTerminalBefore(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	// Create jobs with different statuses
+	j1 := makeJob("ttl-1", "old completed", "haiku")
+	j2 := makeJob("ttl-2", "old failed", "haiku")
+	j3 := makeJob("ttl-3", "recent completed", "haiku")
+	j4 := makeJob("ttl-4", "still queued", "haiku")
+
+	for _, j := range []*Job{j1, j2, j3, j4} {
+		if err := store.Create(ctx, j); err != nil {
+			t.Fatalf("Create %s: %v", j.ID, err)
+		}
+	}
+
+	// Mark j1, j2, j3 as completed/failed with different times
+	store.UpdateStatus(ctx, "ttl-1", StatusCompleted, "result1", "")
+	store.UpdateStatus(ctx, "ttl-2", StatusFailed, "", "error2")
+	store.UpdateStatus(ctx, "ttl-3", StatusCompleted, "result3", "")
+
+	// Manually set old completed_at for j1 and j2
+	oldTime := time.Now().Add(-48 * time.Hour)
+	store.db.ExecContext(ctx, `UPDATE jobs SET completed_at = ? WHERE id IN (?, ?)`, oldTime, "ttl-1", "ttl-2")
+
+	// Delete jobs completed before 24 hours ago
+	cutoff := time.Now().Add(-24 * time.Hour)
+	deleted, err := store.DeleteTerminalBefore(ctx, cutoff)
+	if err != nil {
+		t.Fatalf("DeleteTerminalBefore: %v", err)
+	}
+	if deleted != 2 {
+		t.Errorf("deleted = %d, want 2", deleted)
+	}
+
+	// j1 and j2 should be gone
+	got1, _ := store.Get(ctx, "ttl-1")
+	if got1 != nil {
+		t.Error("ttl-1 should be deleted")
+	}
+	got2, _ := store.Get(ctx, "ttl-2")
+	if got2 != nil {
+		t.Error("ttl-2 should be deleted")
+	}
+
+	// j3 (recent) and j4 (queued) should remain
+	got3, _ := store.Get(ctx, "ttl-3")
+	if got3 == nil {
+		t.Error("ttl-3 should still exist")
+	}
+	got4, _ := store.Get(ctx, "ttl-4")
+	if got4 == nil {
+		t.Error("ttl-4 should still exist")
+	}
+}
+
 func TestResetProcessing(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)

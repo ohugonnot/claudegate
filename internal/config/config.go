@@ -15,14 +15,18 @@ var validModels = map[string]bool{
 }
 
 type Config struct {
-	ListenAddr     string
-	APIKeys        []string
-	ClaudePath     string
-	DefaultModel   string
-	Concurrency    int
-	DBPath         string
-	QueueSize      int
-	SecurityPrompt string
+	ListenAddr             string
+	APIKeys                []string
+	ClaudePath             string
+	DefaultModel           string
+	Concurrency            int
+	DBPath                 string
+	QueueSize              int
+	SecurityPrompt         string
+	JobTimeoutMinutes      int
+	CORSOrigins            []string
+	JobTTLHours            int
+	CleanupIntervalMinutes int
 }
 
 // defaultSecurityPrompt is a server-side guardrail prepended to every job.
@@ -80,6 +84,40 @@ func Load() (*Config, error) {
 	// WARNING: disabling this gives Claude full access to the system within the service user's permissions.
 	if getEnv("CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT", "false") != "true" {
 		cfg.SecurityPrompt = defaultSecurityPrompt
+	}
+
+	cfg.JobTimeoutMinutes, err = getEnvInt("CLAUDEGATE_JOB_TIMEOUT_MINUTES", 0)
+	if err != nil {
+		return nil, fmt.Errorf("CLAUDEGATE_JOB_TIMEOUT_MINUTES: %w", err)
+	}
+	if cfg.JobTimeoutMinutes < 0 {
+		return nil, errors.New("CLAUDEGATE_JOB_TIMEOUT_MINUTES must be >= 0")
+	}
+
+	rawCORSOrigins := getEnv("CLAUDEGATE_CORS_ORIGINS", "")
+	if rawCORSOrigins != "" {
+		for _, o := range strings.Split(rawCORSOrigins, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				cfg.CORSOrigins = append(cfg.CORSOrigins, o)
+			}
+		}
+	}
+
+	cfg.JobTTLHours, err = getEnvInt("CLAUDEGATE_JOB_TTL_HOURS", 0)
+	if err != nil {
+		return nil, fmt.Errorf("CLAUDEGATE_JOB_TTL_HOURS: %w", err)
+	}
+	if cfg.JobTTLHours < 0 {
+		return nil, errors.New("CLAUDEGATE_JOB_TTL_HOURS must be >= 0")
+	}
+
+	cfg.CleanupIntervalMinutes, err = getEnvInt("CLAUDEGATE_CLEANUP_INTERVAL_MINUTES", 60)
+	if err != nil {
+		return nil, fmt.Errorf("CLAUDEGATE_CLEANUP_INTERVAL_MINUTES: %w", err)
+	}
+	if cfg.JobTTLHours > 0 && cfg.CleanupIntervalMinutes < 1 {
+		return nil, errors.New("CLAUDEGATE_CLEANUP_INTERVAL_MINUTES must be >= 1 when job TTL is enabled")
 	}
 
 	return cfg, nil

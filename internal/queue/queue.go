@@ -3,10 +3,12 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/claudegate/claudegate/internal/config"
 	"github.com/claudegate/claudegate/internal/job"
@@ -22,21 +24,35 @@ type SSEEvent struct {
 
 // Queue manages the job queue and workers.
 type Queue struct {
-	jobs  chan string
-	store job.Store
-	subs  map[string][]chan SSEEvent
-	mu    sync.RWMutex
-	cfg   *config.Config
+	jobs    chan string
+	store   job.Store
+	subs    map[string][]chan SSEEvent
+	cancels map[string]context.CancelFunc
+	mu      sync.RWMutex
+	cfg     *config.Config
 }
 
 // New creates a new Queue.
 func New(cfg *config.Config, store job.Store) *Queue {
 	return &Queue{
-		jobs:  make(chan string, cfg.QueueSize),
-		store: store,
-		subs:  make(map[string][]chan SSEEvent),
-		cfg:   cfg,
+		jobs:    make(chan string, cfg.QueueSize),
+		store:   store,
+		subs:    make(map[string][]chan SSEEvent),
+		cancels: make(map[string]context.CancelFunc),
+		cfg:     cfg,
 	}
+}
+
+// Cancel cancels a running job by its ID. Returns true if the job was found and cancelled.
+func (q *Queue) Cancel(jobID string) bool {
+	q.mu.Lock()
+	cancel, ok := q.cancels[jobID]
+	q.mu.Unlock()
+	if ok {
+		cancel()
+		return true
+	}
+	return false
 }
 
 // Enqueue adds a job ID to the queue. Returns an error if the queue is full.
@@ -96,6 +112,32 @@ func (q *Queue) Recovery(ctx context.Context) error {
 	return nil
 }
 
+// StartCleanup launches a background goroutine that periodically deletes old terminal jobs.
+func (q *Queue) StartCleanup(ctx context.Context, ttlHours, intervalMinutes int) {
+	if ttlHours <= 0 {
+		return
+	}
+
+	ticker := time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				before := time.Now().Add(-time.Duration(ttlHours) * time.Hour)
+				deleted, err := q.store.DeleteTerminalBefore(ctx, before)
+				if err != nil {
+					log.Printf("cleanup: %v", err)
+				} else if deleted > 0 {
+					log.Printf("cleanup: deleted %d old jobs", deleted)
+				}
+			}
+		}
+	}()
+}
+
 // runWorker is a worker loop: dequeues jobs and processes them.
 func (q *Queue) runWorker(ctx context.Context) {
 	for {
@@ -109,6 +151,21 @@ func (q *Queue) runWorker(ctx context.Context) {
 }
 
 func (q *Queue) processJob(ctx context.Context, jobID string) {
+	// Check if job was cancelled while waiting in the queue channel.
+	j, err := q.store.Get(ctx, jobID)
+	if err != nil {
+		log.Printf("worker: get job %s: %v", jobID, err)
+		return
+	}
+	if j == nil {
+		log.Printf("worker: job %s not found (deleted?)", jobID)
+		return
+	}
+	if j.Status == job.StatusCancelled {
+		log.Printf("worker: job %s already cancelled, skipping", jobID)
+		return
+	}
+
 	if err := q.store.MarkProcessing(ctx, jobID); err != nil {
 		log.Printf("worker: mark processing %s: %v", jobID, err)
 		return
@@ -116,17 +173,26 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 
 	q.notify(jobID, SSEEvent{Event: "status", Data: `{"status":"processing"}`})
 
-	j, err := q.store.Get(ctx, jobID)
-	if err != nil {
-		log.Printf("worker: get job %s: %v", jobID, err)
-		q.finalizeJob(ctx, jobID, "", fmt.Sprintf("failed to load job: %v", err), "")
-		return
+	// Create cancellable context for this job.
+	jobCtx, jobCancel := context.WithCancel(ctx)
+	defer jobCancel()
+
+	// Apply per-job timeout if configured.
+	if q.cfg.JobTimeoutMinutes > 0 {
+		var timeoutCancel context.CancelFunc
+		jobCtx, timeoutCancel = context.WithTimeout(jobCtx, time.Duration(q.cfg.JobTimeoutMinutes)*time.Minute)
+		defer timeoutCancel()
 	}
-	if j == nil {
-		log.Printf("worker: job %s not found (deleted?)", jobID)
-		q.finalizeJob(ctx, jobID, "", "job not found", "")
-		return
-	}
+
+	// Register cancel func so Cancel() can stop this job while it is running.
+	q.mu.Lock()
+	q.cancels[jobID] = jobCancel
+	q.mu.Unlock()
+	defer func() {
+		q.mu.Lock()
+		delete(q.cancels, jobID)
+		q.mu.Unlock()
+	}()
 
 	onChunk := func(text string) {
 		data, _ := json.Marshal(map[string]string{"text": text})
@@ -141,27 +207,35 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 		systemPrompt = systemPrompt + "\n\n" + j.SystemPrompt
 	}
 
-	result, runErr := worker.Run(ctx, q.cfg.ClaudePath, j.Model, j.Prompt, systemPrompt, onChunk)
+	result, runErr := worker.Run(jobCtx, q.cfg.ClaudePath, j.Model, j.Prompt, systemPrompt, onChunk)
 
 	// Strip markdown code fences if JSON mode (LLMs sometimes ignore instructions)
 	if j.ResponseFormat == "json" && runErr == nil {
 		result = stripCodeFences(result)
 	}
 
-	errMsg := ""
+	var status job.Status
+	var errMsg string
 	if runErr != nil {
-		errMsg = runErr.Error()
+		switch {
+		case errors.Is(runErr, context.Canceled):
+			status = job.StatusCancelled
+			errMsg = "job cancelled by user"
+		case errors.Is(runErr, context.DeadlineExceeded):
+			status = job.StatusFailed
+			errMsg = fmt.Sprintf("job timed out after %dm", q.cfg.JobTimeoutMinutes)
+		default:
+			status = job.StatusFailed
+			errMsg = runErr.Error()
+		}
+	} else {
+		status = job.StatusCompleted
 	}
 
-	q.finalizeJob(ctx, jobID, result, errMsg, j.CallbackURL)
+	q.finalizeJob(ctx, jobID, status, result, errMsg, j.CallbackURL)
 }
 
-func (q *Queue) finalizeJob(ctx context.Context, jobID, result, errMsg, callbackURL string) {
-	status := job.StatusCompleted
-	if errMsg != "" {
-		status = job.StatusFailed
-	}
-
+func (q *Queue) finalizeJob(ctx context.Context, jobID string, status job.Status, result, errMsg, callbackURL string) {
 	if err := q.store.UpdateStatus(ctx, jobID, status, result, errMsg); err != nil {
 		log.Printf("worker: update status %s: %v", jobID, err)
 	}

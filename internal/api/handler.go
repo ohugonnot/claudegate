@@ -36,6 +36,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/jobs/{id}", h.GetJob)
 	mux.HandleFunc("DELETE /api/v1/jobs/{id}", h.DeleteJob)
 	mux.HandleFunc("GET /api/v1/jobs/{id}/sse", h.StreamSSE)
+	mux.HandleFunc("POST /api/v1/jobs/{id}/cancel", h.CancelJob)
 	mux.HandleFunc("GET /api/v1/health", h.Health)
 }
 
@@ -172,6 +173,37 @@ func (h *Handler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// CancelJob handles POST /api/v1/jobs/{id}/cancel.
+// If the job is queued it is marked cancelled in the DB; if it is processing its context is cancelled.
+func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	j, err := h.store.Get(r.Context(), id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
+		return
+	}
+	if j == nil {
+		writeError(w, http.StatusNotFound, "job not found")
+		return
+	}
+
+	if j.Status.IsTerminal() {
+		writeError(w, http.StatusConflict, "job already in terminal state")
+		return
+	}
+
+	if err := h.store.UpdateStatus(r.Context(), id, job.StatusCancelled, "", "job cancelled by user"); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to cancel job")
+		return
+	}
+
+	// If the job is currently processing, cancel its running context.
+	h.queue.Cancel(id)
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "cancelled"})
 }
 
 // Health handles GET /api/v1/health and responds 200.

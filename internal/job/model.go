@@ -13,7 +13,13 @@ const (
 	StatusProcessing Status = "processing"
 	StatusCompleted  Status = "completed"
 	StatusFailed     Status = "failed"
+	StatusCancelled  Status = "cancelled"
 )
+
+// IsTerminal returns true for statuses that represent a final state.
+func (s Status) IsTerminal() bool {
+	return s == StatusCompleted || s == StatusFailed || s == StatusCancelled
+}
 
 var validModels = map[string]bool{
 	"haiku":  true,

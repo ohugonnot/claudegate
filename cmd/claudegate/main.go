@@ -36,14 +36,17 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	q.Start(ctx)
+	q.StartCleanup(ctx, cfg.JobTTLHours, cfg.CleanupIntervalMinutes)
 
 	mux := http.NewServeMux()
 	h := api.NewHandler(store, q, cfg)
 	h.RegisterRoutes(mux)
 
-	handler := api.LoggingMiddleware(
-		api.RequestIDMiddleware(
-			api.AuthMiddleware(cfg.APIKeys, mux),
+	handler := api.CORSMiddleware(cfg.CORSOrigins,
+		api.LoggingMiddleware(
+			api.RequestIDMiddleware(
+				api.AuthMiddleware(cfg.APIKeys, mux),
+			),
 		),
 	)
 
