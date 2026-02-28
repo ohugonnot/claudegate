@@ -18,7 +18,7 @@ const requestIDKey contextKey = "requestID"
 // The /api/v1/health endpoint is exempt from authentication.
 func AuthMiddleware(validKeys []string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/health" {
+		if r.URL.Path == "/api/v1/health" || r.URL.Path == "/" {
 			next.ServeHTTP(w, r)
 			return
 		}

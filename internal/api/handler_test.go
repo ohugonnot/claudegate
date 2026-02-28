@@ -203,3 +203,90 @@ func TestAuth_Health_ExemptFromAuth(t *testing.T) {
 		t.Fatalf("health without key: status = %d, want 200", resp.StatusCode)
 	}
 }
+
+func createTestJob(t *testing.T, srv *httptest.Server, prompt string) {
+	t.Helper()
+	body, _ := json.Marshal(map[string]string{"prompt": prompt})
+	resp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs", body, true)
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("create job %q: status = %d, want 202", prompt, resp.StatusCode)
+	}
+}
+
+func TestListJobs_Returns200(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	createTestJob(t, srv, "job one")
+	createTestJob(t, srv, "job two")
+	createTestJob(t, srv, "job three")
+
+	resp := doRequest(t, srv, http.MethodGet, "/api/v1/jobs", nil, true)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("list: status = %d, want 200", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	jobs, ok := result["jobs"].([]interface{})
+	if !ok {
+		t.Fatalf("jobs field missing or wrong type: %v", result["jobs"])
+	}
+	if len(jobs) != 3 {
+		t.Errorf("len(jobs) = %d, want 3", len(jobs))
+	}
+	if int(result["total"].(float64)) != 3 {
+		t.Errorf("total = %v, want 3", result["total"])
+	}
+}
+
+func TestListJobs_Pagination(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	createTestJob(t, srv, "job one")
+	createTestJob(t, srv, "job two")
+	createTestJob(t, srv, "job three")
+
+	// First page: limit=2, offset=0 → 2 jobs, total 3.
+	resp := doRequest(t, srv, http.MethodGet, "/api/v1/jobs?limit=2&offset=0", nil, true)
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("page1: status = %d, want 200", resp.StatusCode)
+	}
+
+	var page1 map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&page1)
+
+	jobs1 := page1["jobs"].([]interface{})
+	if len(jobs1) != 2 {
+		t.Errorf("page1 len(jobs) = %d, want 2", len(jobs1))
+	}
+	if int(page1["total"].(float64)) != 3 {
+		t.Errorf("page1 total = %v, want 3", page1["total"])
+	}
+
+	// Second page: limit=2, offset=2 → 1 job, total 3.
+	resp2 := doRequest(t, srv, http.MethodGet, "/api/v1/jobs?limit=2&offset=2", nil, true)
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode != http.StatusOK {
+		t.Fatalf("page2: status = %d, want 200", resp2.StatusCode)
+	}
+
+	var page2 map[string]interface{}
+	json.NewDecoder(resp2.Body).Decode(&page2)
+
+	jobs2 := page2["jobs"].([]interface{})
+	if len(jobs2) != 1 {
+		t.Errorf("page2 len(jobs) = %d, want 1", len(jobs2))
+	}
+	if int(page2["total"].(float64)) != 3 {
+		t.Errorf("page2 total = %v, want 3", page2["total"])
+	}
+}

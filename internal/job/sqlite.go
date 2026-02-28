@@ -192,6 +192,69 @@ func (s *SQLiteStore) ResetProcessing(ctx context.Context) ([]string, error) {
 	return ids, nil
 }
 
+// List returns jobs ordered by created_at DESC with pagination, and the total count.
+func (s *SQLiteStore) List(ctx context.Context, limit, offset int) ([]*Job, int, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var total int
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM jobs`).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count jobs: %w", err)
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, prompt, system_prompt, model, status, result, error,
+		       callback_url, metadata, created_at, started_at, completed_at
+		FROM jobs
+		ORDER BY created_at DESC
+		LIMIT ? OFFSET ?
+	`, limit, offset)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list jobs: %w", err)
+	}
+	defer rows.Close()
+
+	var jobs []*Job
+	for rows.Next() {
+		j := &Job{}
+		var metadata sql.NullString
+		var startedAt, completedAt sql.NullTime
+
+		if err := rows.Scan(
+			&j.ID, &j.Prompt, &j.SystemPrompt, &j.Model, &j.Status,
+			&j.Result, &j.Error, &j.CallbackURL, &metadata,
+			&j.CreatedAt, &startedAt, &completedAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("scan job: %w", err)
+		}
+
+		if metadata.Valid {
+			j.Metadata = []byte(metadata.String)
+		}
+		if startedAt.Valid {
+			t := startedAt.Time
+			j.StartedAt = &t
+		}
+		if completedAt.Valid {
+			t := completedAt.Time
+			j.CompletedAt = &t
+		}
+		jobs = append(jobs, j)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate jobs: %w", err)
+	}
+
+	return jobs, total, nil
+}
+
 // nullableJSON returns nil if b is empty, otherwise returns the raw bytes as a string.
 func nullableJSON(b []byte) interface{} {
 	if len(b) == 0 {

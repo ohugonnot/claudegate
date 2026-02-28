@@ -172,6 +172,57 @@ func TestDelete(t *testing.T) {
 	}
 }
 
+func TestList(t *testing.T) {
+	ctx := context.Background()
+	store := newTestStore(t)
+
+	j1 := makeJob("list-1", "first", "haiku")
+	j2 := makeJob("list-2", "second", "haiku")
+	j3 := makeJob("list-3", "third", "haiku")
+
+	for _, j := range []*Job{j1, j2, j3} {
+		if err := store.Create(ctx, j); err != nil {
+			t.Fatalf("Create %s: %v", j.ID, err)
+		}
+	}
+
+	// All jobs.
+	jobs, total, err := store.List(ctx, 20, 0)
+	if err != nil {
+		t.Fatalf("List(20,0): %v", err)
+	}
+	if len(jobs) != 3 {
+		t.Errorf("List(20,0) len = %d, want 3", len(jobs))
+	}
+	if total != 3 {
+		t.Errorf("List(20,0) total = %d, want 3", total)
+	}
+
+	// First page.
+	jobs, total, err = store.List(ctx, 2, 0)
+	if err != nil {
+		t.Fatalf("List(2,0): %v", err)
+	}
+	if len(jobs) != 2 {
+		t.Errorf("List(2,0) len = %d, want 2", len(jobs))
+	}
+	if total != 3 {
+		t.Errorf("List(2,0) total = %d, want 3", total)
+	}
+
+	// Second page.
+	jobs, total, err = store.List(ctx, 2, 2)
+	if err != nil {
+		t.Fatalf("List(2,2): %v", err)
+	}
+	if len(jobs) != 1 {
+		t.Errorf("List(2,2) len = %d, want 1", len(jobs))
+	}
+	if total != 3 {
+		t.Errorf("List(2,2) total = %d, want 3", total)
+	}
+}
+
 func TestResetProcessing(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)

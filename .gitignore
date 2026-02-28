@@ -1,5 +1,6 @@
 bin/
 claudegate
+CLAUDE.md
 *.db
 *.db-wal
 *.db-shm

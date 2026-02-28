@@ -1,8 +1,10 @@
 package api
 
 import (
+	_ "embed"
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/claudegate/claudegate/internal/config"
@@ -10,6 +12,9 @@ import (
 	"github.com/claudegate/claudegate/internal/queue"
 	"github.com/google/uuid"
 )
+
+//go:embed static/index.html
+var frontendHTML []byte
 
 // Handler holds the dependencies for all HTTP handlers.
 type Handler struct {
@@ -25,11 +30,19 @@ func NewHandler(store job.Store, q *queue.Queue, cfg *config.Config) *Handler {
 
 // RegisterRoutes registers all API routes on mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /", h.ServeFrontend)
 	mux.HandleFunc("POST /api/v1/jobs", h.CreateJob)
+	mux.HandleFunc("GET /api/v1/jobs", h.ListJobs)
 	mux.HandleFunc("GET /api/v1/jobs/{id}", h.GetJob)
 	mux.HandleFunc("DELETE /api/v1/jobs/{id}", h.DeleteJob)
 	mux.HandleFunc("GET /api/v1/jobs/{id}/sse", h.StreamSSE)
 	mux.HandleFunc("GET /api/v1/health", h.Health)
+}
+
+// ServeFrontend serves the embedded playground HTML.
+func (h *Handler) ServeFrontend(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(frontendHTML) //nolint:errcheck
 }
 
 // CreateJob handles POST /api/v1/jobs and responds 202 with the created job.
@@ -72,6 +85,42 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusAccepted, j)
+}
+
+// ListJobs handles GET /api/v1/jobs and responds 200 with a paginated list of jobs.
+func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
+	limit := parseIntParam(r.URL.Query().Get("limit"), 20)
+	offset := parseIntParam(r.URL.Query().Get("offset"), 0)
+
+	jobs, total, err := h.store.List(r.Context(), limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list jobs")
+		return
+	}
+
+	// Return an empty array instead of null when there are no jobs.
+	if jobs == nil {
+		jobs = []*job.Job{}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"jobs":   jobs,
+		"total":  total,
+		"limit":  limit,
+		"offset": offset,
+	})
+}
+
+// parseIntParam parses a query string integer, returning the fallback on empty or invalid input.
+func parseIntParam(s string, fallback int) int {
+	if s == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil {
+		return fallback
+	}
+	return v
 }
 
 // GetJob handles GET /api/v1/jobs/{id} and responds 200 with the job.

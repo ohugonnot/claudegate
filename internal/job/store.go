@@ -12,4 +12,6 @@ type Store interface {
 	// ResetProcessing moves all "processing" jobs back to "queued" and returns their IDs.
 	// Called at startup to recover jobs that were interrupted by a crash.
 	ResetProcessing(ctx context.Context) ([]string, error)
+	// List returns a page of jobs ordered by created_at DESC, plus the total count.
+	List(ctx context.Context, limit, offset int) ([]*Job, int, error)
 }
