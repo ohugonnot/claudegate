@@ -43,7 +43,7 @@ const defaultSecurityPrompt = `You are operating in a sandboxed API environment.
 func Load() (*Config, error) {
 	cfg := &Config{
 		ListenAddr:   getEnv("CLAUDEGATE_LISTEN_ADDR", ":8080"),
-		ClaudePath:   getEnv("CLAUDEGATE_CLAUDE_PATH", "/root/.local/bin/claude"),
+		ClaudePath:   getEnv("CLAUDEGATE_CLAUDE_PATH", "/usr/local/bin/claude"),
 		DefaultModel: getEnv("CLAUDEGATE_DEFAULT_MODEL", "haiku"),
 		DBPath:       getEnv("CLAUDEGATE_DB_PATH", "claudegate.db"),
 	}

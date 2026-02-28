@@ -1,4 +1,4 @@
-.PHONY: setup build test run lint clean
+.PHONY: setup build test fmt vet run lint clean
 
 BINARY=bin/claudegate
 
@@ -13,6 +13,12 @@ build:
 
 test:
 	@go test ./... -v -count=1
+
+fmt:
+	@go fmt ./...
+
+vet:
+	@go vet ./...
 
 run: build
 	@./$(BINARY)

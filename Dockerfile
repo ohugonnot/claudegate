@@ -38,4 +38,7 @@ ENV CLAUDEGATE_LISTEN_ADDR=:8080 \
 EXPOSE 8080
 
 # Entrypoint runs as root to copy credentials, then drops to claudegate user
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -sf http://localhost:8080/api/v1/health || exit 1
+
 ENTRYPOINT ["docker-entrypoint.sh"]

@@ -11,10 +11,10 @@ import (
 	"strings"
 )
 
-// ChunkCallback est appelé pour chaque chunk de texte reçu du stream.
+// ChunkCallback is called for each text chunk received from the stream.
 type ChunkCallback func(text string)
 
-// Run execute claude CLI et retourne le résultat complet.
+// Run executes the Claude CLI and returns the complete result.
 func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, onChunk ChunkCallback) (string, error) {
 	args := []string{
 		"--print",
@@ -79,7 +79,7 @@ func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, on
 	return finalResult, nil
 }
 
-// filteredEnv retourne os.Environ() sans les variables commençant par CLAUDE.
+// filteredEnv returns os.Environ() without variables starting with CLAUDE.
 func filteredEnv() []string {
 	env := os.Environ()
 	filtered := make([]string, 0, len(env))
@@ -91,7 +91,7 @@ func filteredEnv() []string {
 	return filtered
 }
 
-// parseLine extrait le texte assistant et/ou le résultat final d'une ligne JSON.
+// parseLine extracts the assistant text and/or final result from a JSON line.
 func parseLine(line []byte) (text, result string, ok bool) {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(line, &raw); err != nil {
@@ -118,7 +118,7 @@ func parseLine(line []byte) (text, result string, ok bool) {
 	return "", "", false
 }
 
-// extractAssistantText parcourt le tableau content et concatène les blocs de type "text".
+// extractAssistantText iterates the content array and concatenates all "text" blocks.
 func extractAssistantText(raw json.RawMessage) string {
 	if raw == nil {
 		return ""

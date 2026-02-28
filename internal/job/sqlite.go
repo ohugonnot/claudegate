@@ -60,7 +60,8 @@ func (s *SQLiteStore) migrate() error {
 		return err
 	}
 	// Add response_format column to existing databases that predate this migration.
-	_, _ = s.db.Exec(`ALTER TABLE jobs ADD COLUMN response_format TEXT NOT NULL DEFAULT ''`)
+	// Error is expected if the column already exists — safe to ignore.
+	s.db.Exec(`ALTER TABLE jobs ADD COLUMN response_format TEXT NOT NULL DEFAULT ''`) //nolint:errcheck
 	return nil
 }
 

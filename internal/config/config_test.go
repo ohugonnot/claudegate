@@ -99,8 +99,8 @@ func TestLoad_Defaults(t *testing.T) {
 	if cfg.ListenAddr != ":8080" {
 		t.Errorf("default ListenAddr = %q, want %q", cfg.ListenAddr, ":8080")
 	}
-	if cfg.ClaudePath != "/root/.local/bin/claude" {
-		t.Errorf("default ClaudePath = %q, want %q", cfg.ClaudePath, "/root/.local/bin/claude")
+	if cfg.ClaudePath != "/usr/local/bin/claude" {
+		t.Errorf("default ClaudePath = %q, want %q", cfg.ClaudePath, "/usr/local/bin/claude")
 	}
 	if cfg.DefaultModel != "haiku" {
 		t.Errorf("default DefaultModel = %q, want %q", cfg.DefaultModel, "haiku")

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -204,7 +205,7 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 
 	homeDir, err := os.UserHomeDir()
 	if err == nil {
-		data, err := os.ReadFile(homeDir + "/.claude/.credentials.json")
+		data, err := os.ReadFile(filepath.Join(homeDir, ".claude", ".credentials.json"))
 		if err == nil {
 			var creds struct {
 				ClaudeAiOauth struct {
