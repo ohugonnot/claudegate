@@ -2,6 +2,8 @@
 
 HTTP gateway that wraps Claude Code CLI as a REST API with an async job queue.
 
+![ClaudeGate Playground](screenshot.png)
+
 ## Features
 
 - Async job queue with configurable concurrency
