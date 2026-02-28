@@ -338,7 +338,7 @@ async function sendJob() {
       return;
     }
     const job = await r.json();
-    jobId = job.id;
+    jobId = job.job_id;
     jobIdDisplay.textContent = '#' + jobId.slice(0, 8);
   } catch (e) {
     showError('Network error: ' + e.message);
@@ -429,7 +429,7 @@ function showError(msg) {
 }
 
 function showJobResult(job) {
-  jobIdDisplay.textContent = '#' + job.id.slice(0, 8);
+  jobIdDisplay.textContent = '#' + job.job_id.slice(0, 8);
   statusBadgeEl.innerHTML = statusBadgeHTML(job.status);
   if (job.result) {
     responseBox.textContent = job.result;
@@ -453,7 +453,9 @@ async function loadHistory() {
     const data = await r.json();
     renderHistory(data.jobs || []);
     setKeyStatus(true);
-  } catch {}
+  } catch (e) {
+    console.error('Failed to load history:', e);
+  }
 }
 
 function renderHistory(jobs) {
@@ -466,14 +468,14 @@ function renderHistory(jobs) {
     const item = document.createElement('div');
     item.className = 'job-item';
     item.innerHTML =
-      `<span class="job-id">#${job.id.slice(0,8)}</span>` +
+      `<span class="job-id">#${job.job_id.slice(0,8)}</span>` +
       `<span class="job-model">${job.model}</span>` +
       statusBadgeHTML(job.status) +
       `<span class="job-time">${timeAgo(job.created_at)}</span>` +
-      `<button class="btn-delete" data-id="${job.id}" title="Delete job">&#128465;</button>`;
+      `<button class="btn-delete" data-id="${job.job_id}" title="Delete job">&#128465;</button>`;
     item.querySelector('.btn-delete').addEventListener('click', async (e) => {
       e.stopPropagation();
-      await deleteJob(job.id);
+      await deleteJob(job.job_id);
     });
     item.addEventListener('click', () => showJobResult(job));
     jobList.appendChild(item);
@@ -486,8 +488,10 @@ async function deleteJob(id) {
       method: 'DELETE',
       headers: authHeaders()
     });
-    loadHistory();
-  } catch {}
+  } catch (e) {
+    console.error('Failed to delete job:', e);
+  }
+  loadHistory();
 }
 
 // ── API Documentation ─────────────────────────────────────────────────────────
@@ -498,17 +502,13 @@ const endpoints = [
     curl: `curl -X POST https://example.com/api/v1/jobs \\
   -H "X-API-Key: your-key" \\
   -H "Content-Type: application/json" \\
-  -d '{
-    "prompt": "Explain what a mutex is.",
-    "model": "haiku",
-    "system_prompt": "Be concise."
-  }'`,
+  -d '{"prompt": "Explain what a mutex is.", "model": "haiku", "system_prompt": "Be concise."}'`,
     response: `{
-  "id": "a1b2c3d4-e5f6-...",
+  "job_id": "a1b2c3d4-e5f6-...",
   "prompt": "Explain what a mutex is.",
   "model": "haiku",
   "status": "queued",
-  "created_at": "2024-01-01T00:00:00Z"
+  "created_at": "2025-01-01T00:00:00Z"
 }`
   },
   {
@@ -517,7 +517,7 @@ const endpoints = [
     curl: `curl "https://example.com/api/v1/jobs?limit=10&offset=0" \\
   -H "X-API-Key: your-key"`,
     response: `{
-  "jobs": [ { "id": "...", "status": "completed", ... } ],
+  "jobs": [ { "job_id": "...", "status": "completed", ... } ],
   "total": 42,
   "limit": 10,
   "offset": 0
@@ -529,13 +529,13 @@ const endpoints = [
     curl: `curl "https://example.com/api/v1/jobs/a1b2c3d4-..." \\
   -H "X-API-Key: your-key"`,
     response: `{
-  "id": "a1b2c3d4-...",
+  "job_id": "a1b2c3d4-...",
   "model": "haiku",
   "status": "completed",
   "result": "A mutex ensures exclusive access to a shared resource.",
-  "created_at": "2024-01-01T00:00:00Z",
-  "started_at": "2024-01-01T00:00:00.1Z",
-  "completed_at": "2024-01-01T00:00:02Z"
+  "created_at": "2025-01-01T00:00:00Z",
+  "started_at": "2025-01-01T00:00:00.1Z",
+  "completed_at": "2025-01-01T00:00:02Z"
 }`
   },
   {
@@ -544,13 +544,13 @@ const endpoints = [
     curl: `curl -N "https://example.com/api/v1/jobs/a1b2c3d4-.../sse" \\
   -H "X-API-Key: your-key"`,
     response: `event: status
-data: {"id":"...","status":"processing"}
+data: {"job_id":"...","status":"processing"}
 
 event: chunk
 data: {"chunk":"A mutex "}
 
 event: result
-data: {"id":"...","status":"completed","result":"A mutex..."}`
+data: {"job_id":"...","status":"completed","result":"A mutex..."}`
   },
   {
     method: 'DELETE', path: '/api/v1/jobs/{id}',
