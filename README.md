@@ -313,7 +313,7 @@ This writes auth tokens to `~/.claude/` on the host, which you mount read-only i
 docker run -d \
   --name claudegate \
   -p 8080:8080 \
-  -v ~/.claude:/home/claudegate/.claude:ro \
+  -v ~/.claude:/claude-credentials:ro \
   -v claudegate-data:/app/data \
   -e CLAUDEGATE_API_KEYS=your-secret-key \
   claudegate
@@ -321,13 +321,13 @@ docker run -d \
 
 | Flag | Purpose |
 |---|---|
-| `-v ~/.claude/.../:ro` | Mount host Claude auth tokens (read-only) |
+| `-v ~/.claude:/claude-credentials:ro` | Mount host Claude auth tokens (read-only) |
 | `-v claudegate-data:/app/data` | Persist the SQLite job database |
 | `-e CLAUDEGATE_API_KEYS` | Required: API key(s) for authentication |
 
 **4. Security note**
 
-The container isolates Claude CLI from the host. Even if the API is compromised, the attacker is confined to the container with no access to the host filesystem or network beyond what Docker allows. The credentials volume is mounted read-only, so the container cannot modify your auth tokens.
+The container isolates Claude CLI from the host. Even if the API is compromised, the attacker is confined to the container with no access to the host filesystem or network beyond what Docker allows. The credentials are mounted read-only at `/claude-credentials` and copied at startup to a writable `~/.claude/` directory inside the container, so Claude CLI can create temporary files (session state, debug logs, plugin directories) without being able to modify your original auth tokens.
 
 ## Systemd
 
