@@ -86,6 +86,10 @@ When `CLAUDEGATE_JOB_TIMEOUT_MINUTES > 0`, `processJob` wraps the job context wi
 
 `Queue.StartCleanup()` runs a background goroutine with a `time.Ticker` that calls `store.DeleteTerminalBefore()`. Only deletes jobs in terminal states (`completed`, `failed`, `cancelled`) with a `completed_at` older than the TTL. The `idx_jobs_completed_at` index supports this query. Disabled when `CLAUDEGATE_JOB_TTL_HOURS=0`.
 
+**12. Docker entrypoint and credentials**
+
+The `docker-entrypoint.sh` script runs as root, copies `.credentials.json` (and optionally `settings.json`) from the read-only mount at `/claude-credentials` into `/home/claudegate/.claude/`, sets ownership to `claudegate:claudegate`, then uses `gosu claudegate` to drop privileges before exec-ing the binary. This is necessary because: (a) host credential files have `600 root:root` permissions, (b) Claude CLI requires a writable `~/.claude/` directory for session state — it creates `session-env/`, `debug/`, and `plugins/` subdirectories at runtime. Mounting credentials read-only directly at `~/.claude/` fails; the entrypoint copy pattern solves this.
+
 ## Configuration
 
 All configuration via environment variables. No config file is loaded by the application — use `.env` with `make run` or `systemd EnvironmentFile`.
@@ -94,7 +98,7 @@ All configuration via environment variables. No config file is loaded by the app
 |---|---|---|
 | `CLAUDEGATE_LISTEN_ADDR` | `:8080` | Address and port to listen on. Use `127.0.0.1:8077` in production behind a reverse proxy. |
 | `CLAUDEGATE_API_KEYS` | *(required)* | Comma-separated list of valid API keys. No default — process will not start without this. |
-| `CLAUDEGATE_CLAUDE_PATH` | `/root/.local/bin/claude` | Path to the Claude CLI binary accessible by the service user. |
+| `CLAUDEGATE_CLAUDE_PATH` | `/usr/local/bin/claude` | Path to the Claude CLI binary accessible by the service user. |
 | `CLAUDEGATE_DEFAULT_MODEL` | `haiku` | Default model when job request omits `model`. Must be `haiku`, `sonnet`, or `opus`. |
 | `CLAUDEGATE_CONCURRENCY` | `1` | Number of parallel workers. Each worker holds one Claude CLI process at a time. |
 | `CLAUDEGATE_DB_PATH` | `claudegate.db` | Path to SQLite database file. Created on first run. |
@@ -141,6 +145,20 @@ systemctl enable --now claudegate
 journalctl -u claudegate -f
 ```
 
+**Docker:** The Dockerfile uses `node:22-bookworm-slim` as runtime base (Node.js is required because Claude CLI is a Node.js package). Claude CLI is pre-installed via `npm install -g @anthropic-ai/claude-code`. The `docker-entrypoint.sh` runs as root to copy credentials from the read-only mount `/claude-credentials` to a writable `~/.claude/` inside the container, then drops privileges to the `claudegate` user via `gosu`. The data volume `/app/data` must be writable by the `claudegate` user (UID from `useradd -r`).
+
+Key learning: Claude CLI needs a WRITABLE `~/.claude/` directory — it creates `session-env/`, `debug/`, `plugins/` subdirectories at runtime. Mounting credentials read-only directly at `~/.claude/` fails. The entrypoint copy pattern solves this.
+
+```bash
+docker build -t claudegate .
+docker run -d \
+  -p 8080:8080 \
+  -v ~/.claude:/claude-credentials:ro \
+  -v claudegate-data:/app/data \
+  -e CLAUDEGATE_API_KEYS=your-key \
+  claudegate
+```
+
 ## Testing
 
 - Unit tests live in each package as `*_test.go` files.
@@ -157,6 +175,7 @@ journalctl -u claudegate -f
 - No CGO anywhere (`modernc.org/sqlite` is pure Go). Keep it that way for cross-compilation.
 - `Store` interface used everywhere — never depend directly on `*SQLiteStore` outside the `job` package.
 - Path parameters via `r.PathValue("id")` (Go 1.22 std routing).
+- Frontend HTML built with string concatenation (not template literals) to avoid whitespace issues in `<pre>` and code blocks. Template literal indentation creates visible extra whitespace inside `<pre>` tags — learned the hard way.
 
 ## Frontend
 
@@ -164,7 +183,11 @@ Single-file SPA at `internal/api/static/index.html`, embedded via `//go:embed`. 
 
 - **Playground**: model selector, optional system prompt, prompt textarea, SSE streaming response. Uses `fetch` + `ReadableStream` (not `EventSource`) because custom headers (`X-API-Key`) are required.
 - **Job History**: last 10 jobs, click to view result, delete button per row.
-- **API Documentation**: collapsible endpoint cards with curl examples.
+- **API Documentation**: collapsible endpoint cards with curl examples, inline parameter documentation (POST body params, query params, path params), and a "Try it" panel on every endpoint with input fields, a "Send Request" button, a response display area showing HTTP status badge, response headers, and JSON-highlighted body.
+- **Draggable splitter**: resizable left/right panel layout. Position saved in `localStorage` under key `cg_split_pos`. Min 20% / max 80% constraint. Hidden on mobile (single-column layout).
+- **Getting Started guide**: 6 collapsible steps — Install CLI, Install Go, Build, Configure, Run & Test, Reverse Proxy.
+- **Integration Examples**: 3 collapsible code examples with PrismJS syntax highlighting — SSE Streaming (JavaScript), Polling + Webhook (PHP), Webhook (Node.js / Express).
+- **PrismJS**: loaded from CDN (okaidia theme) for syntax highlighting in integration examples (languages: bash, javascript, php, json). Replaced a broken regex-based `highlightCode` function that previously existed.
 - **API key**: stored in `localStorage` (`cg_api_key`), validated live against `GET /api/v1/jobs?limit=1`.
 - **JSON field**: the `Job` struct uses `json:"job_id"` for the ID — frontend must always use `job.job_id`, never `job.id`.
 - **JSON mode**: `response_format: "json"` in the job request appends a JSON-only instruction to the system prompt and post-processes the result with `stripCodeFences` to remove markdown code fences LLMs sometimes add despite instructions.
@@ -177,3 +200,5 @@ Single-file SPA at `internal/api/static/index.html`, embedded via `//go:embed`. 
 - Jobs in the in-memory channel at shutdown time are lost. `Recovery()` on next start handles jobs that were already `processing`, but freshly enqueued jobs that never left the channel are dropped. True drain-on-shutdown would require flushing the channel before exit.
 - No metrics or observability (Prometheus, OpenTelemetry, etc.).
 - No model aliasing — `haiku`, `sonnet`, `opus` are passed as-is to the CLI. If Anthropic renames a model tier, `validModels` in both `config.go` and `model.go` must be updated (duplication).
+- Docker image is ~580MB due to the Node.js runtime required for Claude CLI.
+- PrismJS is loaded from CDN — the frontend requires internet access for syntax highlighting in integration examples. API functionality works fully offline.
