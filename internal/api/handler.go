@@ -95,16 +95,6 @@ func (h *Handler) ListJobs(w http.ResponseWriter, r *http.Request) {
 	limit := parseIntParam(r.URL.Query().Get("limit"), 20)
 	offset := parseIntParam(r.URL.Query().Get("offset"), 0)
 
-	if limit <= 0 {
-		limit = 20
-	}
-	if limit > 100 {
-		limit = 100
-	}
-	if offset < 0 {
-		offset = 0
-	}
-
 	jobs, total, err := h.store.List(r.Context(), limit, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list jobs")

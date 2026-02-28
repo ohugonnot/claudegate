@@ -128,7 +128,7 @@ func (s *SQLiteStore) UpdateStatus(ctx context.Context, id string, status Status
 	now := time.Now().UTC()
 
 	var completedAt interface{}
-	if status == StatusCompleted || status == StatusFailed || status == StatusCancelled {
+	if status.IsTerminal() {
 		completedAt = now
 	}
 
