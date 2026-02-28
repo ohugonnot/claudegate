@@ -583,28 +583,28 @@ function buildDocs() {
     const div = document.createElement('div');
     div.className = 'endpoint';
     const mClass = 'method-' + ep.method.toLowerCase();
-    div.innerHTML = `
-      <div class="endpoint-head" data-idx="${i}">
-        <span class="method ${mClass}">${ep.method}</span>
-        <span class="path">${ep.path}</span>
-        <span class="chevron">&#9654;</span>
-      </div>
-      <div class="endpoint-body" id="epbody-${i}">
-        <div class="endpoint-desc">${ep.desc}</div>
-        <div>
-          <div class="code-label">curl example</div>
-          <div class="code-block" style="position:relative">
-            <button class="btn-copy" data-copy="${i}-curl">Copy</button>
-            <code>${ep.curl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code>
-          </div>
-        </div>
-        <div>
-          <div class="code-label">example response</div>
-          <div class="code-block">
-            <code>${highlightJSON(ep.response)}</code>
-          </div>
-        </div>
-      </div>`;
+    const curlEscaped = ep.curl.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const respHighlighted = highlightJSON(ep.response);
+    div.innerHTML =
+      '<div class="endpoint-head" data-idx="'+i+'">' +
+        '<span class="method '+mClass+'">'+ep.method+'</span>' +
+        '<span class="path">'+ep.path+'</span>' +
+        '<span class="chevron">&#9654;</span>' +
+      '</div>' +
+      '<div class="endpoint-body" id="epbody-'+i+'">' +
+        '<div class="endpoint-desc">'+ep.desc+'</div>' +
+        '<div>' +
+          '<div class="code-label">curl example</div>' +
+          '<div class="code-block" style="position:relative">' +
+            '<button class="btn-copy" data-copy="'+i+'-curl">Copy</button>' +
+            '<code>'+curlEscaped+'</code>' +
+          '</div>' +
+        '</div>' +
+        '<div>' +
+          '<div class="code-label">example response</div>' +
+          '<div class="code-block"><code>'+respHighlighted+'</code></div>' +
+        '</div>' +
+      '</div>';
 
     div.querySelector('.endpoint-head').addEventListener('click', () => {
       const body = div.querySelector('.endpoint-body');
@@ -628,7 +628,7 @@ function buildDocs() {
 }
 
 buildDocs();
-loadHistory();
+if (apiKey) loadHistory();
 
 })();
 </script>
