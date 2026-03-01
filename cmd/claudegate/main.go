@@ -45,6 +45,10 @@ func main() {
 	q.Start(ctx)
 	q.StartCleanup(ctx, cfg.JobTTLHours, cfg.CleanupIntervalMinutes)
 
+	if !cfg.DisableKeepalive {
+		startKeepalive(cfg.ClaudePath)
+	}
+
 	mux := http.NewServeMux()
 	h := api.NewHandler(store, q, cfg)
 	h.RegisterRoutes(mux)

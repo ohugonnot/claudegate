@@ -9,7 +9,7 @@ RUN CGO_ENABLED=0 go build -o claudegate ./cmd/claudegate
 # ── Runtime stage ──
 FROM node:22-bookworm-slim
 
-RUN apt-get update && apt-get install -y ca-certificates gosu && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates gosu tmux && rm -rf /var/lib/apt/lists/*
 
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code

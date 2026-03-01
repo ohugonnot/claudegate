@@ -116,6 +116,7 @@ All configuration via environment variables. No config file is loaded by the app
 | `CLAUDEGATE_CORS_ORIGINS` | *(empty)* | Comma-separated allowed CORS origins. `*` allows all origins. Empty disables CORS. |
 | `CLAUDEGATE_JOB_TTL_HOURS` | `0` | Auto-delete terminal jobs older than this many hours. `0` disables cleanup. |
 | `CLAUDEGATE_CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup goroutine runs (in minutes). Only applies when TTL is enabled. |
+| `CLAUDEGATE_DISABLE_KEEPALIVE` | `false` | Set `true` to disable the automatic tmux keepalive session for OAuth token refresh. |
 
 ## API Endpoints
 
@@ -140,7 +141,7 @@ SSE events: `status` (job moved to processing), `chunk` (incremental text), `res
 
 **Claude CLI:** Must be installed and accessible to the service user (e.g., `/usr/local/bin/claude`). Set `CLAUDEGATE_CLAUDE_PATH` accordingly.
 
-**Claude auth:** The service user needs valid OAuth tokens in `~/.claude/.credentials.json`. Run `claude` interactively as that user and use `/login` to authenticate. Tokens expire every ~8 hours. A tmux keepalive session running the interactive CLI may auto-refresh the token (under investigation — see TODO below).
+**Claude auth:** The service user needs valid OAuth tokens in `~/.claude/.credentials.json`. Run `claude` interactively as that user and use `/login` to authenticate. Tokens expire every ~8 hours. The binary automatically starts a `claude-keepalive` tmux session at startup to keep the token refreshed indefinitely (see Token Auto-Refresh section below).
 
 **Apache reverse proxy:** The production instance runs behind Apache on `anime-sanctuary.net/claudegate/` proxying to `127.0.0.1:8077`. Set `CLAUDEGATE_LISTEN_ADDR=127.0.0.1:8077`.
 
@@ -214,19 +215,12 @@ Single-file SPA at `internal/api/static/index.html`, embedded via `//go:embed`. 
 - Docker image is ~580MB due to the Node.js runtime required for Claude CLI.
 - PrismJS is loaded from CDN — the frontend requires internet access for syntax highlighting in integration examples. API functionality works fully offline.
 
-## TODO — Pending Verification
+## Token Auto-Refresh — tmux Keepalive
 
-**tmux token auto-refresh (2026-02-28):**
+**Verified 2026-03-01.** Claude OAuth tokens expire every ~8 hours. An interactive `claude` session running in a persistent tmux window automatically refreshes the token before expiry, keeping workers running indefinitely without manual re-authentication.
 
-A tmux session (`claude-keepalive`) is running on prod as user `claudegate` with an interactive Claude CLI session. The hypothesis: the interactive CLI auto-refreshes the OAuth token before it expires, keeping ClaudeGate's worker processes working without manual re-login.
+**Mechanism:** The Claude CLI auto-refreshes OAuth tokens while an interactive session is alive. Two refreshes were observed over 24h of monitoring, each extending the token by ~8h (triggered ~20 minutes before expiry).
 
-Monitoring script: `/opt/claudegate/scripts/token-monitor.sh` logs to `/home/claudegate/token-monitor.log` every 30 minutes. Check with:
-```
-cat /home/claudegate/token-monitor.log
-```
+**Implementation:** `cmd/claudegate/keepalive.go` — `startKeepalive(claudePath)` is called at startup from `main.go`. It checks for tmux, skips silently if the session already exists (idempotent across restarts), and logs the result. Requires `tmux` installed on the host or in the container. Disable with `CLAUDEGATE_DISABLE_KEEPALIVE=true`.
 
-Look for `TOKEN REFRESHED` entries with a new `expiresAt` value pushed into the future.
-
-**If it works:** automate in Docker (launch tmux + interactive Claude in entrypoint alongside the binary), document in README, add to systemd setup.
-
-**If it doesn't work:** document that Anthropic API keys (pay-per-use) are required for production, OAuth tokens are only suitable for short-lived testing sessions. Remove the tmux approach.
+**Monitoring:** `/opt/claudegate/scripts/token-monitor.sh` logs to `/home/claudegate/token-monitor.log` every 30 minutes. Look for `TOKEN REFRESHED` entries.

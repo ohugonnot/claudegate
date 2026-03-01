@@ -109,7 +109,10 @@ func TestGetJob_Returns200(t *testing.T) {
 	}
 
 	var created map[string]interface{}
-	json.NewDecoder(createResp.Body).Decode(&created)
+	err := json.NewDecoder(createResp.Body).Decode(&created)
+	if err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
 	jobID := created["job_id"].(string)
 
 	getResp := doRequest(t, srv, http.MethodGet, "/api/v1/jobs/"+jobID, nil, true)
@@ -120,7 +123,10 @@ func TestGetJob_Returns200(t *testing.T) {
 	}
 
 	var got map[string]interface{}
-	json.NewDecoder(getResp.Body).Decode(&got)
+	err = json.NewDecoder(getResp.Body).Decode(&got)
+	if err != nil {
+		t.Fatalf("decode get response: %v", err)
+	}
 	if got["job_id"] != jobID {
 		t.Errorf("job_id = %v, want %q", got["job_id"], jobID)
 	}
@@ -153,7 +159,10 @@ func TestDeleteJob_Returns204(t *testing.T) {
 	defer createResp.Body.Close()
 
 	var created map[string]interface{}
-	json.NewDecoder(createResp.Body).Decode(&created)
+	err := json.NewDecoder(createResp.Body).Decode(&created)
+	if err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
 	jobID := created["job_id"].(string)
 
 	delResp := doRequest(t, srv, http.MethodDelete, "/api/v1/jobs/"+jobID, nil, true)
@@ -175,7 +184,10 @@ func TestHealth_Returns200(t *testing.T) {
 	}
 
 	var result map[string]string
-	json.NewDecoder(resp.Body).Decode(&result)
+	err := json.NewDecoder(resp.Body).Decode(&result)
+	if err != nil {
+		t.Fatalf("decode health response: %v", err)
+	}
 	if result["status"] != "ok" {
 		t.Errorf("health status = %q, want %q", result["status"], "ok")
 	}
@@ -254,7 +266,10 @@ func TestCancelJob_Queued_Returns200(t *testing.T) {
 	defer createResp.Body.Close()
 
 	var created map[string]interface{}
-	json.NewDecoder(createResp.Body).Decode(&created)
+	err := json.NewDecoder(createResp.Body).Decode(&created)
+	if err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
 	jobID := created["job_id"].(string)
 
 	cancelResp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs/"+jobID+"/cancel", nil, true)
@@ -272,7 +287,10 @@ func TestCancelJob_Terminal_Returns409(t *testing.T) {
 	defer createResp.Body.Close()
 
 	var created map[string]interface{}
-	json.NewDecoder(createResp.Body).Decode(&created)
+	err := json.NewDecoder(createResp.Body).Decode(&created)
+	if err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
 	jobID := created["job_id"].(string)
 
 	// Manually mark as completed.
@@ -311,7 +329,9 @@ func TestListJobs_Pagination(t *testing.T) {
 	}
 
 	var page1 map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&page1)
+	if err := json.NewDecoder(resp.Body).Decode(&page1); err != nil {
+		t.Fatalf("decode page1 response: %v", err)
+	}
 
 	jobs1 := page1["jobs"].([]interface{})
 	if len(jobs1) != 2 {
@@ -330,7 +350,9 @@ func TestListJobs_Pagination(t *testing.T) {
 	}
 
 	var page2 map[string]interface{}
-	json.NewDecoder(resp2.Body).Decode(&page2)
+	if err := json.NewDecoder(resp2.Body).Decode(&page2); err != nil {
+		t.Fatalf("decode page2 response: %v", err)
+	}
 
 	jobs2 := page2["jobs"].([]interface{})
 	if len(jobs2) != 1 {

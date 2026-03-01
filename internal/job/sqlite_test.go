@@ -226,6 +226,7 @@ func TestList(t *testing.T) {
 func TestDeleteTerminalBefore(t *testing.T) {
 	ctx := context.Background()
 	store := newTestStore(t)
+	var err error
 
 	// Create jobs with different statuses
 	j1 := makeJob("ttl-1", "old completed", "haiku")
@@ -240,13 +241,25 @@ func TestDeleteTerminalBefore(t *testing.T) {
 	}
 
 	// Mark j1, j2, j3 as completed/failed with different times
-	store.UpdateStatus(ctx, "ttl-1", StatusCompleted, "result1", "")
-	store.UpdateStatus(ctx, "ttl-2", StatusFailed, "", "error2")
-	store.UpdateStatus(ctx, "ttl-3", StatusCompleted, "result3", "")
+	err = store.UpdateStatus(ctx, "ttl-1", StatusCompleted, "result1", "")
+	if err != nil {
+		t.Fatalf("UpdateStatus ttl-1: %v", err)
+	}
+	err = store.UpdateStatus(ctx, "ttl-2", StatusFailed, "", "error2")
+	if err != nil {
+		t.Fatalf("UpdateStatus ttl-2: %v", err)
+	}
+	err = store.UpdateStatus(ctx, "ttl-3", StatusCompleted, "result3", "")
+	if err != nil {
+		t.Fatalf("UpdateStatus ttl-3: %v", err)
+	}
 
 	// Manually set old completed_at for j1 and j2
 	oldTime := time.Now().Add(-48 * time.Hour)
-	store.db.ExecContext(ctx, `UPDATE jobs SET completed_at = ? WHERE id IN (?, ?)`, oldTime, "ttl-1", "ttl-2")
+	_, err = store.db.ExecContext(ctx, `UPDATE jobs SET completed_at = ? WHERE id IN (?, ?)`, oldTime, "ttl-1", "ttl-2")
+	if err != nil {
+		t.Fatalf("set completed_at: %v", err)
+	}
 
 	// Delete jobs completed before 24 hours ago
 	cutoff := time.Now().Add(-24 * time.Hour)

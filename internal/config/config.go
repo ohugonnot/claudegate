@@ -27,6 +27,7 @@ type Config struct {
 	CORSOrigins            []string
 	JobTTLHours            int
 	CleanupIntervalMinutes int
+	DisableKeepalive       bool
 }
 
 // defaultSecurityPrompt is a server-side guardrail prepended to every job.
@@ -119,6 +120,8 @@ func Load() (*Config, error) {
 	if cfg.JobTTLHours > 0 && cfg.CleanupIntervalMinutes < 1 {
 		return nil, errors.New("CLAUDEGATE_CLEANUP_INTERVAL_MINUTES must be >= 1 when job TTL is enabled")
 	}
+
+	cfg.DisableKeepalive = getEnv("CLAUDEGATE_DISABLE_KEEPALIVE", "false") == "true"
 
 	return cfg, nil
 }

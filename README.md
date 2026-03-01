@@ -114,6 +114,9 @@ CLAUDEGATE_JOB_TTL_HOURS=0
 
 # Optional: cleanup interval in minutes (only applies when TTL > 0)
 CLAUDEGATE_CLEANUP_INTERVAL_MINUTES=60
+
+# Optional: disable automatic tmux keepalive for Claude OAuth token refresh
+CLAUDEGATE_DISABLE_KEEPALIVE=false
 ```
 
 > **All variables are read from the environment — ClaudeGate has no built-in `.env` loader.**
