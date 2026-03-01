@@ -1,6 +1,6 @@
 #!/bin/bash
 # Mock Claude CLI for testing
-# Outputs stream-json format
+# Outputs stream-json format matching the real CLI structure
 
 # Parse args to find the prompt (last argument)
 PROMPT="${@: -1}"
@@ -8,6 +8,6 @@ PROMPT="${@: -1}"
 # Simulate processing delay
 sleep 0.1
 
-# Output stream-json format
-echo '{"type":"assistant","content":[{"type":"text","text":"Hello from mock Claude!"}]}'
+# Output stream-json format — content is nested under message.content
+echo '{"type":"assistant","message":{"content":[{"type":"text","text":"Hello from mock Claude!"}]}}'
 echo '{"type":"result","result":"Hello from mock Claude!","model":"haiku","stop_reason":"end_turn"}'

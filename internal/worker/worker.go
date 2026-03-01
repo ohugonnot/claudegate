@@ -112,7 +112,14 @@ func parseLine(line []byte) (text, result string, ok bool) {
 
 	switch msgType {
 	case "assistant":
-		text = extractAssistantText(raw["content"])
+		// The CLI wraps content under message.content, not at the top level.
+		var msg struct {
+			Content json.RawMessage `json:"content"`
+		}
+		if err := json.Unmarshal(raw["message"], &msg); err != nil {
+			return "", "", false
+		}
+		text = extractAssistantText(msg.Content)
 		return text, "", true
 
 	case "result":

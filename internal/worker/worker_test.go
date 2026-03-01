@@ -93,7 +93,7 @@ func TestRun_LargeOutput_HandledGracefully(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("#!/bin/bash\n")
 	for i := 0; i < 100; i++ {
-		sb.WriteString(`echo '{"type":"assistant","content":[{"type":"text","text":"chunk"}]}'` + "\n")
+		sb.WriteString(`echo '{"type":"assistant","message":{"content":[{"type":"text","text":"chunk"}]}}'` + "\n")
 	}
 	sb.WriteString(`echo '{"type":"result","result":"done","model":"haiku","stop_reason":"end_turn"}'` + "\n")
 	if err := os.WriteFile(script, []byte(sb.String()), 0o755); err != nil {
