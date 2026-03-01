@@ -105,6 +105,24 @@ Retourne une erreur avec la valeur fautive dans le message (`%q` = avec guilleme
 
 ---
 
+## `RateLimit` — entier simple, sémantique claire
+
+```go
+cfg.RateLimit, err = getEnvInt("CLAUDEGATE_RATE_LIMIT", 0)
+if err != nil {
+    return nil, fmt.Errorf("CLAUDEGATE_RATE_LIMIT: %w", err)
+}
+if cfg.RateLimit < 0 {
+    return nil, errors.New("CLAUDEGATE_RATE_LIMIT must be >= 0")
+}
+```
+
+`0` = désactivé (valeur par défaut). Tout entier positif = nombre de requêtes par seconde par IP. Ce champ est ensuite passé directement à `api.RateLimit(cfg.RateLimit)` dans `main.go`.
+
+Le validModels n'est plus dupliqué ici — `config.go` appelle `job.IsValidModel()` depuis le package `job`. Le package `config` ne définit pas ce qu'est un modèle valide, il délègue cette connaissance au package métier.
+
+---
+
 ## Ce qu'un dev junior raterait ici
 
 1. **Valider les entiers après les avoir lus.** Il y a `getEnvInt` pour lire, puis une condition séparée pour valider la plage (`< 1`, `< 0`). Les deux étapes sont nécessaires : `getEnvInt` vérifie que c'est un nombre, la condition vérifie que c'est un nombre *valide* dans le contexte du domaine.

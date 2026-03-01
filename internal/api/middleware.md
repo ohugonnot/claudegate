@@ -45,6 +45,42 @@ Chain(mux, CORS, Logging, RequestID, Auth)
 
 ---
 
+## `publicPaths` — map d'exemptions
+
+```go
+var publicPaths = map[string]bool{
+    "/api/v1/health": true,
+    "/":              true,
+}
+```
+
+Avant, la condition d'exemption dans `Auth` était un `||` inline :
+```go
+// ancienne version — fragile
+if r.URL.Path == "/api/v1/health" || r.URL.Path == "/" {
+```
+
+Avec une map, ajouter une route publique = une ligne dans `publicPaths`, sans toucher à la logique du middleware. L'intention est aussi plus lisible : `publicPaths[r.URL.Path]` dit clairement "ce chemin est-il public ?".
+
+---
+
+## `Logging` — request_id corrélé
+
+```go
+reqID, _ := r.Context().Value(requestIDKey).(string)
+slog.Info("request", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(start), "request_id", reqID)
+```
+
+Chaque ligne de log inclut maintenant le `request_id`. Quand un utilisateur signale une erreur et donne son `X-Request-ID`, on peut filtrer les logs :
+
+```bash
+journalctl -u claudegate | grep "request_id=abc-123"
+```
+
+Le `request_id` est attaché au context par `RequestID` (middleware en amont). `Logging` s'exécute **après** `RequestID` dans la chaîne d'exécution (même si `RequestID` est wrappé après dans `Chain`) — voir la section `Chain` ci-dessous pour comprendre l'ordre.
+
+---
+
 ## `Auth` — constant-time comparison
 
 ```go
