@@ -128,7 +128,7 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Job, error) {
 func (s *SQLiteStore) UpdateStatus(ctx context.Context, id string, status Status, result, errMsg string) error {
 	now := time.Now().UTC()
 
-	var completedAt interface{}
+	var completedAt any
 	if status.IsTerminal() {
 		completedAt = now
 	}
@@ -278,7 +278,7 @@ func (s *SQLiteStore) DeleteTerminalBefore(ctx context.Context, before time.Time
 }
 
 // nullableJSON returns nil if b is empty, otherwise returns the raw bytes as a string.
-func nullableJSON(b []byte) interface{} {
+func nullableJSON(b []byte) any {
 	if len(b) == 0 {
 		return nil
 	}

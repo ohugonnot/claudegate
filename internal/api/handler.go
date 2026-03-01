@@ -3,6 +3,7 @@ package api
 import (
 	_ "embed"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -85,7 +86,11 @@ func (h *Handler) CreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.queue.Enqueue(j.ID); err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to enqueue job")
+		if errors.Is(err, queue.ErrQueueFull) {
+			writeError(w, http.StatusServiceUnavailable, "server busy, retry later")
+		} else {
+			writeError(w, http.StatusInternalServerError, "failed to enqueue job")
+		}
 		return
 	}
 

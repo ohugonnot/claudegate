@@ -11,7 +11,7 @@ func TestCORSMiddleware_AllowAll(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := CORSMiddleware([]string{"*"}, inner)
+	handler := CORS([]string{"*"})(inner)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/health", nil)
 	req.Header.Set("Origin", "https://example.com")
@@ -31,7 +31,7 @@ func TestCORSMiddleware_SpecificOrigin(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := CORSMiddleware([]string{"https://allowed.com"}, inner)
+	handler := CORS([]string{"https://allowed.com"})(inner)
 
 	// Allowed origin
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -59,7 +59,7 @@ func TestCORSMiddleware_Preflight(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := CORSMiddleware([]string{"*"}, inner)
+	handler := CORS([]string{"*"})(inner)
 
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/jobs", nil)
 	req.Header.Set("Origin", "https://example.com")
@@ -79,7 +79,7 @@ func TestCORSMiddleware_Disabled(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := CORSMiddleware(nil, inner)
+	handler := CORS(nil)(inner)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	req.Header.Set("Origin", "https://example.com")
@@ -96,7 +96,7 @@ func TestCORSMiddleware_NoOriginHeader(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	handler := CORSMiddleware([]string{"*"}, inner)
+	handler := CORS([]string{"*"})(inner)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	// No Origin header

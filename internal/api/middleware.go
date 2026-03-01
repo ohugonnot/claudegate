@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 	"crypto/subtle"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,34 +14,47 @@ type contextKey string
 
 const requestIDKey contextKey = "requestID"
 
-// AuthMiddleware verifies the X-API-Key header against the list of valid keys.
+// Middleware is a function that wraps an http.Handler.
+type Middleware func(http.Handler) http.Handler
+
+// Chain applies middlewares to h in order: first middleware is outermost (executes first).
+func Chain(h http.Handler, middlewares ...Middleware) http.Handler {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		h = middlewares[i](h)
+	}
+	return h
+}
+
+// Auth returns a Middleware that verifies the X-API-Key header against the list of valid keys.
 // The /api/v1/health endpoint is exempt from authentication.
-func AuthMiddleware(validKeys []string, next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/v1/health" || r.URL.Path == "/" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		provided := r.Header.Get("X-API-Key")
-		if provided == "" {
-			writeError(w, http.StatusUnauthorized, "missing X-API-Key header")
-			return
-		}
-
-		for _, key := range validKeys {
-			if subtle.ConstantTimeCompare([]byte(provided), []byte(key)) == 1 {
+func Auth(validKeys []string) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/v1/health" || r.URL.Path == "/" {
 				next.ServeHTTP(w, r)
 				return
 			}
-		}
 
-		writeError(w, http.StatusUnauthorized, "invalid API key")
-	})
+			provided := r.Header.Get("X-API-Key")
+			if provided == "" {
+				writeError(w, http.StatusUnauthorized, "missing X-API-Key header")
+				return
+			}
+
+			for _, key := range validKeys {
+				if subtle.ConstantTimeCompare([]byte(provided), []byte(key)) == 1 {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			writeError(w, http.StatusUnauthorized, "invalid API key")
+		})
+	}
 }
 
-// RequestIDMiddleware attaches a UUID request ID to the response header and request context.
-func RequestIDMiddleware(next http.Handler) http.Handler {
+// RequestID is a Middleware that attaches a UUID request ID to the response header and request context.
+var RequestID Middleware = func(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := uuid.New().String()
 		w.Header().Set("X-Request-ID", id)
@@ -67,11 +80,13 @@ func (sw *statusResponseWriter) Flush() {
 	}
 }
 
-// CORSMiddleware sets CORS headers based on allowed origins.
+// CORS returns a Middleware that sets CORS headers based on allowed origins.
 // An empty slice disables CORS. A single "*" allows all origins.
-func CORSMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
+func CORS(allowedOrigins []string) Middleware {
 	if len(allowedOrigins) == 0 {
-		return next
+		return func(next http.Handler) http.Handler {
+			return next
+		}
 	}
 
 	allowAll := len(allowedOrigins) == 1 && allowedOrigins[0] == "*"
@@ -80,35 +95,37 @@ func CORSMiddleware(allowedOrigins []string, next http.Handler) http.Handler {
 		originSet[o] = true
 	}
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			origin := r.Header.Get("Origin")
+			if origin == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if allowAll || originSet[origin] {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
+				w.Header().Set("Access-Control-Max-Age", "86400")
+			}
+
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
 			next.ServeHTTP(w, r)
-			return
-		}
-
-		if allowAll || originSet[origin] {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key")
-			w.Header().Set("Access-Control-Max-Age", "86400")
-		}
-
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+		})
+	}
 }
 
-// LoggingMiddleware logs the method, path, status code, and duration of each request.
-func LoggingMiddleware(next http.Handler) http.Handler {
+// Logging is a Middleware that logs the method, path, status code, and duration of each request.
+var Logging Middleware = func(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		log.Printf("%s %s %d %s", r.Method, r.URL.Path, sw.status, time.Since(start))
+		slog.Info("request", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(start))
 	})
 }

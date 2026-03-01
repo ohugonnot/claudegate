@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,21 +16,28 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("config: %v", err)
+		slog.Error("config", "error", err)
+		os.Exit(1)
 	}
 
 	store, err := job.NewSQLiteStore(cfg.DBPath)
 	if err != nil {
-		log.Fatalf("store: %v", err)
+		slog.Error("store", "error", err)
+		os.Exit(1)
 	}
 	defer store.Close()
 
 	q := queue.New(cfg, store)
 
 	if err := q.Recovery(context.Background()); err != nil {
-		log.Fatalf("recovery: %v", err)
+		slog.Error("recovery", "error", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -42,12 +49,11 @@ func main() {
 	h := api.NewHandler(store, q, cfg)
 	h.RegisterRoutes(mux)
 
-	handler := api.CORSMiddleware(cfg.CORSOrigins,
-		api.LoggingMiddleware(
-			api.RequestIDMiddleware(
-				api.AuthMiddleware(cfg.APIKeys, mux),
-			),
-		),
+	handler := api.Chain(mux,
+		api.CORS(cfg.CORSOrigins),
+		api.Logging,
+		api.RequestID,
+		api.Auth(cfg.APIKeys),
 	)
 
 	srv := &http.Server{
@@ -62,17 +68,18 @@ func main() {
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
-		log.Println("shutting down...")
+		slog.Info("shutting down")
 		cancel()
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
-			log.Printf("shutdown error: %v", err)
+			slog.Error("shutdown error", "error", err)
 		}
 	}()
 
-	log.Printf("claudegate listening on %s", cfg.ListenAddr)
+	slog.Info("claudegate listening", "addr", cfg.ListenAddr)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatalf("server error: %v", err)
+		slog.Error("server error", "error", err)
+		os.Exit(1)
 	}
 }

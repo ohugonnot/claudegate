@@ -40,7 +40,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *job.SQLiteStore) {
 	h.RegisterRoutes(mux)
 
 	// Wrap with auth middleware (same as production).
-	handler := AuthMiddleware(cfg.APIKeys, mux)
+	handler := Auth(cfg.APIKeys)(mux)
 
 	srv := httptest.NewServer(handler)
 	t.Cleanup(func() {

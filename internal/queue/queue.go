@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +15,10 @@ import (
 	"github.com/claudegate/claudegate/internal/webhook"
 	"github.com/claudegate/claudegate/internal/worker"
 )
+
+// ErrQueueFull is returned by Enqueue when the job channel is at capacity.
+// Callers should map this to HTTP 503 Service Unavailable.
+var ErrQueueFull = errors.New("queue full")
 
 // SSEEvent represents a Server-Sent Events event.
 type SSEEvent struct {
@@ -61,7 +65,7 @@ func (q *Queue) Enqueue(jobID string) error {
 	case q.jobs <- jobID:
 		return nil
 	default:
-		return fmt.Errorf("queue full: cannot enqueue job %s", jobID)
+		return fmt.Errorf("%w: job %s", ErrQueueFull, jobID)
 	}
 }
 
@@ -106,7 +110,7 @@ func (q *Queue) Recovery(ctx context.Context) error {
 	}
 	for _, id := range ids {
 		if err := q.Enqueue(id); err != nil {
-			log.Printf("recovery: failed to enqueue job %s: %v", id, err)
+			slog.Error("recovery: failed to enqueue job", "job_id", id, "error", err)
 		}
 	}
 	return nil
@@ -129,9 +133,9 @@ func (q *Queue) StartCleanup(ctx context.Context, ttlHours, intervalMinutes int)
 				before := time.Now().Add(-time.Duration(ttlHours) * time.Hour)
 				deleted, err := q.store.DeleteTerminalBefore(ctx, before)
 				if err != nil {
-					log.Printf("cleanup: %v", err)
+					slog.Error("cleanup", "error", err)
 				} else if deleted > 0 {
-					log.Printf("cleanup: deleted %d old jobs", deleted)
+					slog.Info("cleanup: deleted old jobs", "count", deleted)
 				}
 			}
 		}
@@ -150,24 +154,35 @@ func (q *Queue) runWorker(ctx context.Context) {
 	}
 }
 
+// chunkWriter implements worker.ChunkWriter, forwarding chunks to SSE subscribers.
+type chunkWriter struct {
+	q     *Queue
+	jobID string
+}
+
+func (cw *chunkWriter) WriteChunk(text string) {
+	data, _ := json.Marshal(map[string]string{"text": text})
+	cw.q.notify(cw.jobID, SSEEvent{Event: "chunk", Data: string(data)})
+}
+
 func (q *Queue) processJob(ctx context.Context, jobID string) {
 	// Check if job was cancelled while waiting in the queue channel.
 	j, err := q.store.Get(ctx, jobID)
 	if err != nil {
-		log.Printf("worker: get job %s: %v", jobID, err)
+		slog.Error("worker: get job", "job_id", jobID, "error", err)
 		return
 	}
 	if j == nil {
-		log.Printf("worker: job %s not found (deleted?)", jobID)
+		slog.Warn("worker: job not found", "job_id", jobID)
 		return
 	}
 	if j.Status == job.StatusCancelled {
-		log.Printf("worker: job %s already cancelled, skipping", jobID)
+		slog.Info("worker: job already cancelled, skipping", "job_id", jobID)
 		return
 	}
 
 	if err := q.store.MarkProcessing(ctx, jobID); err != nil {
-		log.Printf("worker: mark processing %s: %v", jobID, err)
+		slog.Error("worker: mark processing", "job_id", jobID, "error", err)
 		return
 	}
 
@@ -194,10 +209,7 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 		q.mu.Unlock()
 	}()
 
-	onChunk := func(text string) {
-		data, _ := json.Marshal(map[string]string{"text": text})
-		q.notify(jobID, SSEEvent{Event: "chunk", Data: string(data)})
-	}
+	cw := &chunkWriter{q: q, jobID: jobID}
 
 	systemPrompt := q.cfg.SecurityPrompt
 	if j.ResponseFormat == "json" {
@@ -207,7 +219,7 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 		systemPrompt = systemPrompt + "\n\n" + j.SystemPrompt
 	}
 
-	result, runErr := worker.Run(jobCtx, q.cfg.ClaudePath, j.Model, j.Prompt, systemPrompt, onChunk)
+	result, runErr := worker.Run(jobCtx, q.cfg.ClaudePath, j.Model, j.Prompt, systemPrompt, cw)
 
 	// Strip markdown code fences if JSON mode (LLMs sometimes ignore instructions)
 	if j.ResponseFormat == "json" && runErr == nil {
@@ -237,7 +249,7 @@ func (q *Queue) processJob(ctx context.Context, jobID string) {
 
 func (q *Queue) finalizeJob(ctx context.Context, jobID string, status job.Status, result, errMsg, callbackURL string) {
 	if err := q.store.UpdateStatus(ctx, jobID, status, result, errMsg); err != nil {
-		log.Printf("worker: update status %s: %v", jobID, err)
+		slog.Error("worker: update status", "job_id", jobID, "error", err)
 	}
 
 	data, _ := json.Marshal(map[string]string{

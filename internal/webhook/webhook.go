@@ -3,18 +3,25 @@ package webhook
 import (
 	"bytes"
 	"fmt"
-	"log"
+	"log/slog"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
 )
 
+const (
+	retryAttempts = 8
+	retryBase     = time.Second
+	retryCap      = 5 * time.Minute
+)
+
 // Send dispatches the JSON payload to callbackURL asynchronously.
-// 3 retries max with exponential backoff (1s, 2s, 4s). 30s timeout per request.
+// 8 retries max with full-jitter exponential backoff (cap 5 min). 30s timeout per request.
 func Send(callbackURL string, payload []byte) {
 	if err := validateURL(callbackURL); err != nil {
-		log.Printf("webhook: rejected callback URL %s: %v", callbackURL, err)
+		slog.Warn("webhook: rejected callback URL", "url", callbackURL, "error", err)
 		return
 	}
 	go send(callbackURL, payload)
@@ -52,20 +59,28 @@ func validateURL(rawURL string) error {
 
 func send(callbackURL string, payload []byte) {
 	client := &http.Client{Timeout: 30 * time.Second}
-	backoff := time.Second
 
-	for attempt := 1; attempt <= 3; attempt++ {
+	for attempt := 1; attempt <= retryAttempts; attempt++ {
 		err := post(client, callbackURL, payload)
 		if err == nil {
 			return
 		}
-		log.Printf("webhook attempt %d/3 failed for %s: %v", attempt, callbackURL, err)
-		if attempt < 3 {
-			time.Sleep(backoff)
-			backoff *= 2
+		slog.Warn("webhook attempt failed", "attempt", attempt, "url", callbackURL, "error", err)
+		if attempt < retryAttempts {
+			time.Sleep(jitter(attempt))
 		}
 	}
-	log.Printf("webhook: all retries exhausted for %s", callbackURL)
+	slog.Error("webhook: all retries exhausted", "url", callbackURL)
+}
+
+// jitter returns a random duration between 0 and min(retryCap, retryBase * 2^attempt).
+// Full jitter prevents synchronized retries when multiple webhooks fail at the same time.
+func jitter(attempt int) time.Duration {
+	exp := retryBase * (1 << attempt) // base * 2^attempt
+	if exp > retryCap {
+		exp = retryCap
+	}
+	return time.Duration(rand.Int63n(int64(exp)))
 }
 
 func post(client *http.Client, url string, payload []byte) error {

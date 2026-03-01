@@ -11,11 +11,13 @@ import (
 	"strings"
 )
 
-// ChunkCallback is called for each text chunk received from the stream.
-type ChunkCallback func(text string)
+// ChunkWriter receives text chunks as they stream from the CLI.
+type ChunkWriter interface {
+	WriteChunk(text string)
+}
 
 // Run executes the Claude CLI and returns the complete result.
-func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, onChunk ChunkCallback) (string, error) {
+func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, w ChunkWriter) (string, error) {
 	args := []string{
 		"--print",
 		"--verbose",
@@ -58,8 +60,8 @@ func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, on
 		if result != "" {
 			finalResult = result
 		}
-		if text != "" && onChunk != nil {
-			onChunk(text)
+		if text != "" && w != nil {
+			w.WriteChunk(text)
 		}
 	}
 

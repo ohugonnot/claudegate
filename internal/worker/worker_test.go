@@ -20,16 +20,21 @@ func mockClaudePath(t *testing.T) string {
 	return filepath.Join(filepath.Dir(file), "..", "..", "testdata", "mock-claude.sh")
 }
 
+type testChunkWriter struct {
+	chunks []string
+}
+
+func (w *testChunkWriter) WriteChunk(text string) {
+	w.chunks = append(w.chunks, text)
+}
+
 func TestRun_MockClaude_ReturnsResult(t *testing.T) {
 	ctx := context.Background()
 	claudePath := mockClaudePath(t)
 
-	var chunks []string
-	onChunk := func(text string) {
-		chunks = append(chunks, text)
-	}
+	cw := &testChunkWriter{}
 
-	result, err := Run(ctx, claudePath, "haiku", "say hello", "", onChunk)
+	result, err := Run(ctx, claudePath, "haiku", "say hello", "", cw)
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -40,7 +45,7 @@ func TestRun_MockClaude_ReturnsResult(t *testing.T) {
 	}
 
 	// The mock emits one assistant chunk.
-	if len(chunks) == 0 {
+	if len(cw.chunks) == 0 {
 		t.Error("expected at least one chunk, got none")
 	}
 }
