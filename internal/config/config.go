@@ -6,13 +6,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-)
 
-var validModels = map[string]bool{
-	"haiku":  true,
-	"sonnet": true,
-	"opus":   true,
-}
+	"github.com/claudegate/claudegate/internal/job"
+)
 
 type Config struct {
 	ListenAddr             string
@@ -77,7 +73,7 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("CLAUDEGATE_QUEUE_SIZE: %w", err)
 	}
 
-	if !validModels[cfg.DefaultModel] {
+	if !job.IsValidModel(cfg.DefaultModel) {
 		return nil, fmt.Errorf("CLAUDEGATE_DEFAULT_MODEL %q must be one of: haiku, sonnet, opus", cfg.DefaultModel)
 	}
 

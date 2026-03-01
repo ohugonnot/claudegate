@@ -27,6 +27,7 @@ func makeJob(id, prompt, model string) *Job {
 }
 
 func TestCreateAndGet(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
@@ -57,19 +58,21 @@ func TestCreateAndGet(t *testing.T) {
 }
 
 func TestGet_NotFound(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
 	got, err := store.Get(ctx, "nonexistent")
-	if err != nil {
-		t.Fatalf("Get: unexpected error: %v", err)
-	}
 	if got != nil {
 		t.Errorf("Get returned %+v, want nil", got)
+	}
+	if err != ErrJobNotFound {
+		t.Fatalf("Get: expected ErrJobNotFound, got %v", err)
 	}
 }
 
 func TestUpdateStatus_Completed(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
@@ -98,6 +101,7 @@ func TestUpdateStatus_Completed(t *testing.T) {
 }
 
 func TestUpdateStatus_Failed(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
@@ -126,6 +130,7 @@ func TestUpdateStatus_Failed(t *testing.T) {
 }
 
 func TestMarkProcessing(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
@@ -151,6 +156,7 @@ func TestMarkProcessing(t *testing.T) {
 }
 
 func TestDelete(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
@@ -164,15 +170,16 @@ func TestDelete(t *testing.T) {
 	}
 
 	got, err := store.Get(ctx, "job-5")
-	if err != nil {
-		t.Fatalf("Get after delete: %v", err)
-	}
 	if got != nil {
 		t.Errorf("Get after delete returned %+v, want nil", got)
+	}
+	if err != ErrJobNotFound {
+		t.Fatalf("Get after delete: expected ErrJobNotFound, got %v", err)
 	}
 }
 
 func TestList(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 
@@ -224,6 +231,7 @@ func TestList(t *testing.T) {
 }
 
 func TestDeleteTerminalBefore(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 	var err error
@@ -293,6 +301,7 @@ func TestDeleteTerminalBefore(t *testing.T) {
 }
 
 func TestResetProcessing(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store := newTestStore(t)
 

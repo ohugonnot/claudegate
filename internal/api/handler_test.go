@@ -77,6 +77,7 @@ func doRequest(t *testing.T, srv *httptest.Server, method, path string, body []b
 }
 
 func TestCreateJob_Returns202WithJobID(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	body, _ := json.Marshal(map[string]string{"prompt": "hello"})
@@ -97,6 +98,7 @@ func TestCreateJob_Returns202WithJobID(t *testing.T) {
 }
 
 func TestGetJob_Returns200(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	// Create a job first.
@@ -133,6 +135,7 @@ func TestGetJob_Returns200(t *testing.T) {
 }
 
 func TestGetJob_NotFound_Returns404(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 	resp := doRequest(t, srv, http.MethodGet, "/api/v1/jobs/does-not-exist", nil, true)
 	defer resp.Body.Close()
@@ -142,6 +145,7 @@ func TestGetJob_NotFound_Returns404(t *testing.T) {
 }
 
 func TestDeleteJob_NotFound_Returns404(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 	resp := doRequest(t, srv, http.MethodDelete, "/api/v1/jobs/does-not-exist", nil, true)
 	defer resp.Body.Close()
@@ -151,6 +155,7 @@ func TestDeleteJob_NotFound_Returns404(t *testing.T) {
 }
 
 func TestDeleteJob_Returns204(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	// Create a job to delete.
@@ -174,6 +179,7 @@ func TestDeleteJob_Returns204(t *testing.T) {
 }
 
 func TestHealth_Returns200(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	resp := doRequest(t, srv, http.MethodGet, "/api/v1/health", nil, false)
@@ -194,6 +200,7 @@ func TestHealth_Returns200(t *testing.T) {
 }
 
 func TestAuth_NoAPIKey_Returns401(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	body, _ := json.Marshal(map[string]string{"prompt": "unauthorized"})
@@ -206,6 +213,7 @@ func TestAuth_NoAPIKey_Returns401(t *testing.T) {
 }
 
 func TestAuth_Health_ExemptFromAuth(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	// Health endpoint must be reachable without an API key.
@@ -228,6 +236,7 @@ func createTestJob(t *testing.T, srv *httptest.Server, prompt string) {
 }
 
 func TestListJobs_Returns200(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	createTestJob(t, srv, "job one")
@@ -259,6 +268,7 @@ func TestListJobs_Returns200(t *testing.T) {
 }
 
 func TestCancelJob_Queued_Returns200(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	body, _ := json.Marshal(map[string]string{"prompt": "cancel me"})
@@ -280,6 +290,7 @@ func TestCancelJob_Queued_Returns200(t *testing.T) {
 }
 
 func TestCancelJob_Terminal_Returns409(t *testing.T) {
+	t.Parallel()
 	srv, store := newTestServer(t)
 
 	body, _ := json.Marshal(map[string]string{"prompt": "already done"})
@@ -304,6 +315,7 @@ func TestCancelJob_Terminal_Returns409(t *testing.T) {
 }
 
 func TestCancelJob_NotFound_Returns404(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	resp := doRequest(t, srv, http.MethodPost, "/api/v1/jobs/does-not-exist/cancel", nil, true)
@@ -314,6 +326,7 @@ func TestCancelJob_NotFound_Returns404(t *testing.T) {
 }
 
 func TestListJobs_Pagination(t *testing.T) {
+	t.Parallel()
 	srv, _ := newTestServer(t)
 
 	createTestJob(t, srv, "job one")

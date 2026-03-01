@@ -168,12 +168,12 @@ func (cw *chunkWriter) WriteChunk(text string) {
 func (q *Queue) processJob(ctx context.Context, jobID string) {
 	// Check if job was cancelled while waiting in the queue channel.
 	j, err := q.store.Get(ctx, jobID)
-	if err != nil {
-		slog.Error("worker: get job", "job_id", jobID, "error", err)
+	if errors.Is(err, job.ErrJobNotFound) {
+		slog.Warn("worker: job not found", "job_id", jobID)
 		return
 	}
-	if j == nil {
-		slog.Warn("worker: job not found", "job_id", jobID)
+	if err != nil {
+		slog.Error("worker: get job", "job_id", jobID, "error", err)
 		return
 	}
 	if j.Status == job.StatusCancelled {
@@ -266,7 +266,7 @@ func (q *Queue) finalizeJob(ctx context.Context, jobID string, status job.Status
 			"result": result,
 			"error":  errMsg,
 		})
-		webhook.Send(callbackURL, payload)
+		webhook.Send(context.WithoutCancel(ctx), callbackURL, payload)
 	}
 }
 
@@ -286,12 +286,12 @@ func stripCodeFences(s string) string {
 }
 
 // notify sends an event to all subscribers of a job without blocking.
+// The RLock is held for the entire iteration to prevent notifyAndClose from
+// closing channels between the slice copy and the send (send on closed channel panic).
 func (q *Queue) notify(jobID string, event SSEEvent) {
 	q.mu.RLock()
-	chans := q.subs[jobID]
-	q.mu.RUnlock()
-
-	for _, ch := range chans {
+	defer q.mu.RUnlock()
+	for _, ch := range q.subs[jobID] {
 		select {
 		case ch <- event:
 		default:

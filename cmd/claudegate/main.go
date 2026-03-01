@@ -55,8 +55,8 @@ func main() {
 
 	handler := api.Chain(mux,
 		api.CORS(cfg.CORSOrigins),
-		api.Logging,
 		api.RequestID,
+		api.Logging,
 		api.Auth(cfg.APIKeys),
 	)
 
