@@ -32,7 +32,7 @@ POST /jobs → Handler → SQLite → Queue (chan) → Worker (claude CLI) → S
 
 - **internal/queue** (`queue.go`): Buffered `chan string` holds job IDs. `Start()` launches N worker goroutines. `Subscribe/Unsubscribe` manage per-job SSE fan-out via `map[string][]chan SSEEvent` protected by `sync.RWMutex`. `Recovery()` re-enqueues jobs stuck in `processing`.
 
-- **internal/worker** (`worker.go`): Execs claude CLI with `--print --verbose --output-format stream-json --dangerously-skip-permissions`. Parses stdout line by line (NDJSON). Calls `onChunk` for each `"assistant"` message, returns the `"result"` string at the end. Strips all `CLAUDE*` env vars from the subprocess.
+- **internal/worker** (`worker.go`): Execs claude CLI with `--print --verbose --output-format stream-json --dangerously-skip-permissions`. Parses stdout line by line (NDJSON). Calls `onChunk` for each `"assistant"` message, returns the `"result"` string at the end. Strips all `CLAUDE*` env vars from the subprocess. **Streaming granularity:** the CLI emits one complete `assistant` message per response — not token-by-token. Clients receive a single `chunk` SSE event containing the full text, followed by the `result` event. True token streaming is not possible via the CLI (it would require calling the Anthropic API directly, which defeats the purpose of using a Max subscription).
 
 - **internal/webhook** (`webhook.go`): Fire-and-forget `goroutine`. 8 retries max with full-jitter exponential backoff (base 1s, cap 5 min). 30s per-request timeout. No dead-letter queue — failures are logged and dropped.
 
@@ -49,6 +49,10 @@ Things a developer MUST know before touching the code:
 **2. `--verbose` is required**
 
 The CLI must be called with `--verbose` alongside `--print --output-format stream-json`. Without it, the CLI refuses to emit the stream-json format.
+
+**3. CLI streaming is coarse-grained — one chunk per response**
+
+The Claude CLI does not stream tokens progressively. With `--output-format stream-json`, it emits a single `assistant` JSON message containing the complete response text once generation is done. The SSE `chunk` event therefore carries the full response in one shot, not word-by-word. This is an inherent limitation of the CLI approach — the entire point of this gateway is to reuse a Claude Max subscription (OAuth), which precludes calling the Anthropic streaming API directly. Do not attempt to "fix" this by switching to direct API calls.
 
 **3. `--dangerously-skip-permissions` and the root restriction**
 
@@ -211,6 +215,7 @@ Single-file SPA at `internal/api/static/index.html`, embedded via `//go:embed`. 
 - Webhook payload is minimal: `job_id`, `status`, `result`, `error` — does not include the full job object.
 - Jobs in the in-memory channel at shutdown time are lost. `Recovery()` on next start handles jobs that were already `processing`, but freshly enqueued jobs that never left the channel are dropped. True drain-on-shutdown would require flushing the channel before exit.
 - No metrics or observability (Prometheus, OpenTelemetry, etc.).
+- **SSE streaming is coarse-grained:** clients receive one `chunk` event with the complete response, not a token-by-token stream. The CLI emits a single `assistant` message once generation completes. This is by design — the gateway exists to leverage a Claude Max subscription (OAuth), which makes direct Anthropic API streaming calls irrelevant.
 - No model aliasing — `haiku`, `sonnet`, `opus` are passed as-is to the CLI. If Anthropic renames a model tier, `validModels` in both `config.go` and `model.go` must be updated (duplication).
 - Docker image is ~580MB due to the Node.js runtime required for Claude CLI.
 - PrismJS is loaded from CDN — the frontend requires internet access for syntax highlighting in integration examples. API functionality works fully offline.
