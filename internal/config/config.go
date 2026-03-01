@@ -24,6 +24,7 @@ type Config struct {
 	JobTTLHours            int
 	CleanupIntervalMinutes int
 	DisableKeepalive       bool
+	RateLimit              int // requests per second per IP, 0 = disabled
 }
 
 // defaultSecurityPrompt is a server-side guardrail prepended to every job.
@@ -118,6 +119,14 @@ func Load() (*Config, error) {
 	}
 
 	cfg.DisableKeepalive = getEnv("CLAUDEGATE_DISABLE_KEEPALIVE", "false") == "true"
+
+	cfg.RateLimit, err = getEnvInt("CLAUDEGATE_RATE_LIMIT", 0)
+	if err != nil {
+		return nil, fmt.Errorf("CLAUDEGATE_RATE_LIMIT: %w", err)
+	}
+	if cfg.RateLimit < 0 {
+		return nil, errors.New("CLAUDEGATE_RATE_LIMIT must be >= 0")
+	}
 
 	return cfg, nil
 }

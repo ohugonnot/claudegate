@@ -121,6 +121,7 @@ All configuration via environment variables. No config file is loaded by the app
 | `CLAUDEGATE_JOB_TTL_HOURS` | `0` | Auto-delete terminal jobs older than this many hours. `0` disables cleanup. |
 | `CLAUDEGATE_CLEANUP_INTERVAL_MINUTES` | `60` | How often the cleanup goroutine runs (in minutes). Only applies when TTL is enabled. |
 | `CLAUDEGATE_DISABLE_KEEPALIVE` | `false` | Set `true` to disable the automatic tmux keepalive session for OAuth token refresh. |
+| `CLAUDEGATE_RATE_LIMIT` | `0` | Max job submissions per second per IP. `0` disables rate limiting. |
 
 ## API Endpoints
 

@@ -58,6 +58,7 @@ func main() {
 		api.RequestID,
 		api.Logging,
 		api.Auth(cfg.APIKeys),
+		api.RateLimit(cfg.RateLimit),
 	)
 
 	srv := &http.Server{
