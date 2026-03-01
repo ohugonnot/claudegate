@@ -16,6 +16,9 @@ const (
 	StatusCancelled  Status = "cancelled"
 )
 
+// ErrJobNotFound is returned by Store.Get when the requested job does not exist.
+var ErrJobNotFound = errors.New("job not found")
+
 // IsTerminal returns true for statuses that represent a final state.
 func (s Status) IsTerminal() bool {
 	return s == StatusCompleted || s == StatusFailed || s == StatusCancelled
@@ -25,6 +28,11 @@ var validModels = map[string]bool{
 	"haiku":  true,
 	"sonnet": true,
 	"opus":   true,
+}
+
+// IsValidModel reports whether the given model name is recognised.
+func IsValidModel(model string) bool {
+	return validModels[model]
 }
 
 type Job struct {

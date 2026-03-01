@@ -1,4 +1,4 @@
-.PHONY: setup build test fmt vet run lint clean
+.PHONY: setup build test fmt vet run lint vuln clean
 
 BINARY=bin/claudegate
 
@@ -24,8 +24,10 @@ run: build
 	@./$(BINARY)
 
 lint:
-	@command -v golangci-lint >/dev/null 2>&1 || go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@golangci-lint run ./...
+	@go tool golangci-lint run ./...
+
+vuln:
+	@go tool govulncheck ./...
 
 clean:
 	@rm -rf bin/

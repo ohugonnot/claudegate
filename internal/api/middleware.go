@@ -25,12 +25,18 @@ func Chain(h http.Handler, middlewares ...Middleware) http.Handler {
 	return h
 }
 
+// publicPaths are exempt from API key authentication.
+var publicPaths = map[string]bool{
+	"/api/v1/health": true,
+	"/":              true,
+}
+
 // Auth returns a Middleware that verifies the X-API-Key header against the list of valid keys.
 // The /api/v1/health endpoint is exempt from authentication.
 func Auth(validKeys []string) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/api/v1/health" || r.URL.Path == "/" {
+			if publicPaths[r.URL.Path] {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -126,6 +132,7 @@ var Logging Middleware = func(next http.Handler) http.Handler {
 		start := time.Now()
 		sw := &statusResponseWriter{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(sw, r)
-		slog.Info("request", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(start))
+		reqID, _ := r.Context().Value(requestIDKey).(string)
+		slog.Info("request", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(start), "request_id", reqID)
 	})
 }

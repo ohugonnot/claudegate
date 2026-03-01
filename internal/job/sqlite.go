@@ -27,6 +27,12 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("enable WAL mode: %w", err)
 	}
 
+	// Avoid SQLITE_BUSY errors under concurrent reads and writes.
+	if _, err = db.Exec("PRAGMA busy_timeout = 10000"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set busy_timeout: %w", err)
+	}
+
 	s := &SQLiteStore{db: db}
 	if err = s.migrate(); err != nil {
 		db.Close()
@@ -55,12 +61,12 @@ func (s *SQLiteStore) migrate() error {
 		CREATE INDEX IF NOT EXISTS idx_jobs_status       ON jobs(status);
 		CREATE INDEX IF NOT EXISTS idx_jobs_created_at   ON jobs(created_at);
 		CREATE INDEX IF NOT EXISTS idx_jobs_completed_at ON jobs(completed_at);
+		CREATE INDEX IF NOT EXISTS idx_jobs_status_completed_at ON jobs(status, completed_at);
 	`)
 	if err != nil {
 		return err
 	}
-	// Add response_format column to existing databases that predate this migration.
-	// Error is expected if the column already exists — safe to ignore.
+	// Idempotent column migration — error means column already exists, safe to ignore.
 	s.db.Exec(`ALTER TABLE jobs ADD COLUMN response_format TEXT NOT NULL DEFAULT ''`) //nolint:errcheck
 	return nil
 }
@@ -105,7 +111,7 @@ func (s *SQLiteStore) Get(ctx context.Context, id string) (*Job, error) {
 		&j.ResponseFormat, &j.CreatedAt, &startedAt, &completedAt,
 	)
 	if err == sql.ErrNoRows {
-		return nil, nil
+		return nil, ErrJobNotFound
 	}
 	if err != nil {
 		return nil, fmt.Errorf("get job %s: %w", id, err)

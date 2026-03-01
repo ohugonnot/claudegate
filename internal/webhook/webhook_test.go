@@ -5,6 +5,7 @@ import (
 )
 
 func TestValidateURL(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		url     string
@@ -44,6 +45,7 @@ func TestValidateURL(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := validateURL(tt.url)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("validateURL(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)

@@ -6,10 +6,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 )
+
+// maxOutputBytes caps the total stdout read from the Claude CLI per job (10 MB).
+// Prevents a runaway/verbose LLM response from filling RAM.
+const maxOutputBytes = 10 * 1024 * 1024
 
 // ChunkWriter receives text chunks as they stream from the CLI.
 type ChunkWriter interface {
@@ -46,7 +51,7 @@ func Run(ctx context.Context, claudePath, model, prompt, systemPrompt string, w 
 	}
 
 	var finalResult string
-	scanner := bufio.NewScanner(stdout)
+	scanner := bufio.NewScanner(io.LimitReader(stdout, maxOutputBytes))
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {

@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+
+	"github.com/claudegate/claudegate/internal/job"
 )
 
 // StreamSSE handles GET /api/v1/jobs/{id}/sse.
@@ -18,12 +21,12 @@ func (h *Handler) StreamSSE(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	j, err := h.store.Get(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get job")
+	if errors.Is(err, job.ErrJobNotFound) {
+		writeError(w, http.StatusNotFound, "job not found")
 		return
 	}
-	if j == nil {
-		writeError(w, http.StatusNotFound, "job not found")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
 		return
 	}
 

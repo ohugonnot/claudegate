@@ -138,12 +138,12 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	j, err := h.store.Get(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get job")
+	if errors.Is(err, job.ErrJobNotFound) {
+		writeError(w, http.StatusNotFound, "job not found")
 		return
 	}
-	if j == nil {
-		writeError(w, http.StatusNotFound, "job not found")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
 		return
 	}
 
@@ -154,13 +154,13 @@ func (h *Handler) GetJob(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteJob(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
-	j, err := h.store.Get(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get job")
+	_, err := h.store.Get(r.Context(), id)
+	if errors.Is(err, job.ErrJobNotFound) {
+		writeError(w, http.StatusNotFound, "job not found")
 		return
 	}
-	if j == nil {
-		writeError(w, http.StatusNotFound, "job not found")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
 		return
 	}
 
@@ -178,12 +178,12 @@ func (h *Handler) CancelJob(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	j, err := h.store.Get(r.Context(), id)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "failed to get job")
+	if errors.Is(err, job.ErrJobNotFound) {
+		writeError(w, http.StatusNotFound, "job not found")
 		return
 	}
-	if j == nil {
-		writeError(w, http.StatusNotFound, "job not found")
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to get job")
 		return
 	}
 

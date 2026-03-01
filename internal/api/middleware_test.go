@@ -7,6 +7,7 @@ import (
 )
 
 func TestCORSMiddleware_AllowAll(t *testing.T) {
+	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -27,6 +28,7 @@ func TestCORSMiddleware_AllowAll(t *testing.T) {
 }
 
 func TestCORSMiddleware_SpecificOrigin(t *testing.T) {
+	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -55,6 +57,7 @@ func TestCORSMiddleware_SpecificOrigin(t *testing.T) {
 }
 
 func TestCORSMiddleware_Preflight(t *testing.T) {
+	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -75,6 +78,7 @@ func TestCORSMiddleware_Preflight(t *testing.T) {
 }
 
 func TestCORSMiddleware_Disabled(t *testing.T) {
+	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -92,6 +96,7 @@ func TestCORSMiddleware_Disabled(t *testing.T) {
 }
 
 func TestCORSMiddleware_NoOriginHeader(t *testing.T) {
+	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

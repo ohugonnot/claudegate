@@ -34,7 +34,7 @@ POST /jobs → Handler → SQLite → Queue (chan) → Worker (claude CLI) → S
 
 - **internal/worker** (`worker.go`): Execs claude CLI with `--print --verbose --output-format stream-json --dangerously-skip-permissions`. Parses stdout line by line (NDJSON). Calls `onChunk` for each `"assistant"` message, returns the `"result"` string at the end. Strips all `CLAUDE*` env vars from the subprocess.
 
-- **internal/webhook** (`webhook.go`): Fire-and-forget `goroutine`. 3 retries with exponential backoff (1s, 2s, 4s). 30s per-request timeout. No dead-letter queue — failures are logged and dropped.
+- **internal/webhook** (`webhook.go`): Fire-and-forget `goroutine`. 8 retries max with full-jitter exponential backoff (base 1s, cap 5 min). 30s per-request timeout. No dead-letter queue — failures are logged and dropped.
 
 - **internal/api** (`handler.go`, `middleware.go`, `sse.go`, `static/index.html`): Eight routes on Go 1.22 native mux (method+path patterns). Middleware chain: `CORSMiddleware → LoggingMiddleware → RequestIDMiddleware → AuthMiddleware → mux`. CORS is outermost so OPTIONS preflight bypasses auth. Auth uses `subtle.ConstantTimeCompare`. `/api/v1/health` and `/` are exempt from auth. The frontend SPA (`static/index.html`) is embedded at compile time via `//go:embed` — no filesystem access at runtime.
 
@@ -58,9 +58,9 @@ Required for daemon/non-interactive mode. The flag does NOT work when running as
 
 `config.go:defaultSecurityPrompt` is prepended to every job's system prompt in `queue.go:processJob()`. It instructs Claude to refuse filesystem, shell, and network operations. This is a soft guardrail (LLM instruction, not a technical sandbox). Disable with `CLAUDEGATE_UNSAFE_NO_SECURITY_PROMPT=true`. If both config security prompt and job `system_prompt` are set, they are concatenated: `securityPrompt + "\n\n" + jobSystemPrompt`.
 
-**5. SQLite WAL mode**
+**5. SQLite WAL mode and busy_timeout**
 
-Enabled at startup with `PRAGMA journal_mode=WAL`. Without it, any write (job result) locks the entire file and blocks concurrent GET poll requests. Do not remove this pragma.
+Enabled at startup with `PRAGMA journal_mode=WAL` followed by `PRAGMA busy_timeout = 10000`. WAL avoids full-file write locks under concurrent reads. `busy_timeout` prevents `SQLITE_BUSY` errors under concurrent worker writes — SQLite will retry for up to 10s instead of returning immediately. Do not remove either pragma.
 
 **6. Crash recovery**
 

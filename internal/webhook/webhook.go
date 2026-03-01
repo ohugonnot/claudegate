@@ -2,6 +2,7 @@ package webhook
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -19,12 +20,14 @@ const (
 
 // Send dispatches the JSON payload to callbackURL asynchronously.
 // 8 retries max with full-jitter exponential backoff (cap 5 min). 30s timeout per request.
-func Send(callbackURL string, payload []byte) {
+// ctx should be context.WithoutCancel(jobCtx) so retries survive job cancellation but
+// stop on server shutdown.
+func Send(ctx context.Context, callbackURL string, payload []byte) {
 	if err := validateURL(callbackURL); err != nil {
 		slog.Warn("webhook: rejected callback URL", "url", callbackURL, "error", err)
 		return
 	}
-	go send(callbackURL, payload)
+	go send(ctx, callbackURL, payload)
 }
 
 // validateURL blocks non-HTTPS schemes and private/internal IP ranges.
@@ -57,11 +60,14 @@ func validateURL(rawURL string) error {
 	return nil
 }
 
-func send(callbackURL string, payload []byte) {
+func send(ctx context.Context, callbackURL string, payload []byte) {
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	for attempt := 1; attempt <= retryAttempts; attempt++ {
-		err := post(client, callbackURL, payload)
+		if ctx.Err() != nil {
+			return
+		}
+		err := post(ctx, client, callbackURL, payload)
 		if err == nil {
 			return
 		}
@@ -83,8 +89,14 @@ func jitter(attempt int) time.Duration {
 	return time.Duration(rand.Int63n(int64(exp)))
 }
 
-func post(client *http.Client, url string, payload []byte) error {
-	resp, err := client.Post(url, "application/json", bytes.NewReader(payload))
+func post(ctx context.Context, client *http.Client, callbackURL string, payload []byte) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, callbackURL, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
