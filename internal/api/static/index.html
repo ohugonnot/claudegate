@@ -575,6 +575,13 @@ select option { background: var(--bg-raised); }
   flex-shrink: 0;
 }
 
+.job-duration {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+
 .btn-action-sm {
   background: none;
   color: var(--text-tertiary);
@@ -1083,6 +1090,17 @@ function authHeaders(extra) {
   return Object.assign({ 'X-API-Key': apiKey }, extra || {});
 }
 
+function jobDuration(job) {
+  if (!job.started_at || !job.completed_at) return '';
+  var ms = new Date(job.completed_at) - new Date(job.started_at);
+  if (ms < 0) return '';
+  var s = ms / 1000;
+  if (s < 60) return s.toFixed(1) + 's';
+  var m = Math.floor(s / 60);
+  var rem = Math.round(s % 60);
+  return m + 'm ' + rem + 's';
+}
+
 function timeAgo(dateStr) {
   var diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
   if (diff < 60) return diff + 's ago';
@@ -1316,10 +1334,12 @@ function renderHistory(jobs) {
     var item = document.createElement('div');
     item.className = 'job-item';
     var isTerminal = job.status === 'completed' || job.status === 'failed' || job.status === 'cancelled';
+    var dur = jobDuration(job);
     item.innerHTML =
       '<span class="job-id-short">#' + job.job_id.slice(0, 8) + '</span>' +
       '<span class="job-model">' + job.model + '</span>' +
       badgeHTML(job.status) +
+      (dur ? '<span class="job-duration">' + dur + '</span>' : '') +
       '<span class="job-time">' + timeAgo(job.created_at) + '</span>' +
       (!isTerminal ? '<button class="btn-action-sm" data-cancel="' + job.job_id + '" title="Cancel">&#9632;</button>' : '') +
       '<button class="btn-action-sm danger" data-delete="' + job.job_id + '" title="Delete">&#128465;</button>';
