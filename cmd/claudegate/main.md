@@ -42,19 +42,24 @@ Un dev junior ferait `store := job.NewSQLiteStore()` à l'intérieur de la queue
 ```go
 handler := api.Chain(mux,
     api.CORS(cfg.CORSOrigins),
-    api.Logging,
     api.RequestID,
+    api.Logging,
     api.Auth(cfg.APIKeys),
+    api.RateLimit(cfg.RateLimit),
 )
 ```
 
 `Chain` applique les middlewares dans l'ordre de lecture : le premier de la liste est le plus à l'extérieur, le dernier est juste avant le routeur. Une requête entrante traverse les couches de haut en bas :
 
 ```
-CORS → Logging → RequestID → Auth → mux (routes)
+CORS → RequestID → Logging → Auth → RateLimit → mux (routes)
 ```
 
 **CORS est en premier volontairement** : les requêtes `OPTIONS` (preflight navigateur) doivent recevoir les headers CORS *avant* de toucher l'auth. Si tu mets Auth en premier, ton navigateur reçoit un 401 sur le preflight et bloque tout.
+
+**RequestID est avant Logging volontairement** : `RequestID` attache l'UUID au context, puis `Logging` le lit depuis ce context pour l'inclure dans la ligne de log. Si tu inverses l'ordre, `request_id` est toujours vide dans les logs.
+
+**RateLimit est après Auth** : seules les requêtes authentifiées consomment des tokens du bucket. Les 401 ne coûtent rien au rate limiter.
 
 Le pattern : tous les middlewares ont le même type `Middleware = func(http.Handler) http.Handler`. Ceux qui ont besoin de config (`CORS`, `Auth`) sont des **factory functions** — elles prennent leur config et retournent un middleware. Ceux sans config (`Logging`, `RequestID`) sont directement des variables de type `Middleware`.
 

@@ -70,9 +70,9 @@ Enabled at startup with `PRAGMA journal_mode=WAL` followed by `PRAGMA busy_timeo
 
 `queue.Recovery()` runs before workers start. It calls `store.ResetProcessing()`, which moves all `processing` jobs back to `queued` and returns their IDs, then re-enqueues them. This gives at-least-once execution guarantees across restarts.
 
-**7. `Store.Get` returns `(nil, nil)` for missing jobs**
+**7. `Store.Get` returns `ErrJobNotFound` for missing jobs**
 
-When a job ID does not exist, `Get` returns `nil, nil` — not an error. Every handler that calls `Get` must check `if j == nil` before using the result. This is already done in all current handlers; maintain this pattern.
+When a job ID does not exist, `Get` returns `nil, job.ErrJobNotFound`. Every handler that calls `Get` must use `errors.Is(err, job.ErrJobNotFound)` to detect the 404 case — not `if j == nil`. This is already done in all current handlers; maintain this pattern.
 
 **8. Enqueue order matters**
 
@@ -211,7 +211,7 @@ Single-file SPA at `internal/api/static/index.html`, embedded via `//go:embed`. 
 
 ## Known Limitations and Future Work
 
-- No rate limiting on job submission.
+- Per-IP rate limiting is opt-in via `CLAUDEGATE_RATE_LIMIT` (default `0` = disabled). When disabled, there is no protection against job submission floods.
 - CORS is opt-in via `CLAUDEGATE_CORS_ORIGINS`. If not configured, cross-origin requests from SPAs will fail.
 - Webhook payload is minimal: `job_id`, `status`, `result`, `error` — does not include the full job object.
 - Jobs in the in-memory channel at shutdown time are lost. `Recovery()` on next start handles jobs that were already `processing`, but freshly enqueued jobs that never left the channel are dropped. True drain-on-shutdown would require flushing the channel before exit.
