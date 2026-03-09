@@ -2,6 +2,11 @@
 
 HTTP gateway that wraps Claude Code CLI as a REST API with an async job queue.
 
+![Go 1.24+](https://img.shields.io/badge/Go-1.24%2B-00ADD8?logo=go&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+![Tests](https://github.com/ohugonnot/claudegate/actions/workflows/tests.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 ![ClaudeGate Playground](screenshot.png)
 
 ## Features
@@ -543,11 +548,13 @@ A job is created in SQLite and enqueued in memory. Workers pick it up, call the 
 ```
 claudegate/
 ├── cmd/claudegate/
-│   └── main.go              # Entry point: wiring, startup, graceful shutdown
+│   ├── main.go              # Entry point: wiring, startup, graceful shutdown
+│   └── keepalive.go         # tmux keepalive for Claude OAuth token refresh
 ├── internal/
 │   ├── api/
 │   │   ├── handler.go       # HTTP handlers for all REST endpoints
 │   │   ├── middleware.go    # Auth, request ID, logging middleware
+│   │   ├── ratelimit.go     # Per-IP rate limiting
 │   │   └── sse.go           # Server-Sent Events streaming handler
 │   ├── config/
 │   │   └── config.go        # Configuration loaded from environment variables
