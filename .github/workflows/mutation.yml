@@ -1,0 +1,43 @@
+name: Mutation
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gooze:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # --diff needs the base branch history
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      # gooze needs Go 1.27.3 to build. Pick that toolchain for this one
+      # command; the tests still run on the Go from go.mod.
+      - name: Install gooze
+        run: GOTOOLCHAIN=go1.27.3 go install gooze.dev/pkg/gooze@v1.3.0
+
+      # Pull requests: mutate only the lines the PR changes, report only.
+      # Add --threshold-diff-total 80 to fail the job below 80%.
+      - name: Mutation testing (changed lines)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: gooze run --diff "origin/$BASE_REF" ./...
+
+      # Run the workflow by hand to mutate the whole module.
+      - name: Mutation testing (whole module)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          gooze run -p 2 ./...
+          gooze report view
